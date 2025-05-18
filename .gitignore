@@ -1,1 +1,4 @@
 /target
+/bin
+/.zig-cache
+/zig-out
