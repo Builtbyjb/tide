@@ -1,6 +1,10 @@
+use std::{ fs, path::{Path, PathBuf}, io::Result };
+//serde: parsing .toml
+// toml: creating .toml
+// tokio: async
 
 /*
-  NOTE:
+  TODO:
   * create a tide.toml file in programs root dir
   * parse the tide.toml file
   * the commands concurrently
@@ -20,8 +24,23 @@ file = []
 ext = []
 */
 
-fn init() {
+// fn print_usage() {}
 
+// fn init() {
+
+// }
+
+fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
+  for e in fs::read_dir(path)? {
+    let e = e?;
+    let path = e.path();
+    if path.is_dir() {
+      visit(&path, cb)?;
+    } else if path.is_file() {
+      cb(path);
+    }
+  }
+  Ok(())
 }
 
 fn run(cmd:String) {
@@ -38,5 +57,12 @@ fn run(cmd:String) {
 }
 
 fn main() {
-  run(String::from("dev"))
+  run(String::from("dev"));
+
+  let path = Path::new(".");
+  let mut files = Vec::new();
+  visit(path, &mut |e| files.push(e)).unwrap();
+  for file in files {
+    println!("{:?}", file);
+  }
 }
