@@ -1,39 +1,70 @@
 use std::{ fs, path::{Path, PathBuf}, io::Result, env };
+use serde::Serialize;
+use toml;
 
 //serde: parsing .toml
 // toml: creating .toml
 // tokio: async
 
-/* ##### Sample tide.toml config #####
-root_dir = "."
+// TODO: proper error handling
 
-[command]
-dev = []
-prod = []
-test = []
+#[derive(Serialize)]
+struct Config {
+  root_dir:String,
+  command:Command,
+  exclude:Exclude,
+}
 
-[exclude]
-dir = []
-file = []
-ext = []
-*/
+#[derive(Serialize)]
+struct Command {
+  dev:Vec<String>,
+  prod:Vec<String>,
+  test:Vec<String>
+}
+
+#[derive(Serialize)]
+struct Exclude {
+  dir:Vec<String>,
+  file:Vec<String>,
+  ext:Vec<String>,
+}
 
 fn print_usage() {
   let usage = r#" 
     Usage: 
       To create a configuration file -> ./tide init
       To run a command in the commands table -> ./tide run [command]
+      For live reload -> ./tide run [command] --watch
       To exit -> CTRL + C
   "#;
-
   println!("{}", usage)
 }
 
 // Initialize tide by creating a tide.toml file in the projects root dir
-fn init() {
-  println!("tide.toml file created")
+fn init() -> Result<()> {
+  // Check if tide.toml file exists and create a new one if not
+  let config = Config {
+    root_dir: ".".to_string(),
+    command: Command {
+      dev: vec![],
+      prod: vec![],
+      test: vec![]
+
+    },
+    exclude: Exclude { 
+      dir: vec![], 
+      file: vec![], 
+      ext:vec![] 
+    }
+  };
+
+  let toml_str = toml::to_string_pretty(&config).unwrap();
+  fs::write("tide.toml", toml_str).unwrap();
+
+  Ok(())
 }
 
+// Watcher function
 fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
   for e in fs::read_dir(path)? {
     let e = e?;
@@ -47,7 +78,8 @@ fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
   Ok(())
 }
 
-fn run(cmd:&String) {
+fn run(cmd:&String, watch:bool) {
+  // check if cmd is a valid command
   let styled_name = r#"
        __   _      __    
       / /_ (_)____/ /___ 
@@ -57,20 +89,33 @@ fn run(cmd:&String) {
   "#;
 
   println!("{}", styled_name);
-  println!("{}", cmd);
+  println!("{}, {}", cmd, watch);
 }
 
 fn main() {
   // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
+  // Is there a better way to implement this
   if args.len() == 2 && args[1] == "init" {
-    init()
-  } else if args.len() == 3 && args[1] == "run" {
-    run(&args[2]);
+    init().unwrap();
+  } else if args.len() == 3 {
+    if args[1] == "run" {
+      run(&args[2], false)
+    } else {
+      print_usage();
+      return
+    }
+  } else if args.len() == 4 {
+    if args[1] == "run" &&  (args[3] == "--watch" || args[3] == "-w") {
+      run(&args[2], true)
+    } else {
+      print_usage();
+      return
+    }
   } else {
     print_usage();
-    return
+    return;
   }
 
   // TODO
@@ -78,8 +123,9 @@ fn main() {
   // The watcher runs on a different thread
   // Function calls doesn't require a while loop
 
-  let path = Path::new(".");
-  let mut files = Vec::new();
-  visit(path, &mut |e| files.push(e)).unwrap();
-  for file in files { println!("{:?}", file); }
+  // let path = Path::new(".");
+  // let mut files = Vec::new();
+  // visit(path, &mut |e| files.push(e)).unwrap();
+  // for file in files { println!("{:?}", file); }
+
 }
