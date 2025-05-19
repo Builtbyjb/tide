@@ -1,28 +1,27 @@
 use std::{ fs, path::{Path, PathBuf}, io::Result, env };
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use toml;
 
-//serde: parsing .toml
-// toml: creating .toml
 // tokio: async
 
 // TODO: proper error handling
+// TODO: Character case should not matter
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Config {
   root_dir:String,
   command:Command,
   exclude:Exclude,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Command {
   dev:Vec<String>,
   prod:Vec<String>,
   test:Vec<String>
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Exclude {
   dir:Vec<String>,
   file:Vec<String>,
@@ -42,7 +41,7 @@ fn print_usage() {
 
 // Initialize tide by creating a tide.toml file in the projects root dir
 fn init() -> Result<()> {
-  // Check if tide.toml file exists and create a new one if not
+  // TODO: Check if tide.toml file exists and create a new one if not
   let config = Config {
     root_dir: ".".to_string(),
     command: Command {
@@ -52,8 +51,8 @@ fn init() -> Result<()> {
 
     },
     exclude: Exclude { 
-      dir: vec![], 
-      file: vec![], 
+      dir: vec![String::from(".git") ], 
+      file: vec![String::from("README.md"), String::from("LICENSE.md")], 
       ext:vec![] 
     }
   };
@@ -79,6 +78,12 @@ fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
 }
 
 fn run(cmd:&String, watch:bool) {
+  // Open config file
+  let toml_str = fs::read_to_string("tide.toml").unwrap();
+  
+  // Parse toml file to config
+  let toml_config:Config = toml::from_str(&toml_str).unwrap();
+
   // check if cmd is a valid command
   let styled_name = r#"
        __   _      __    
@@ -90,13 +95,23 @@ fn run(cmd:&String, watch:bool) {
 
   println!("{}", styled_name);
   println!("{}, {}", cmd, watch);
+  println!("{:#?}", toml_config)
+  // TODO
+  // handle keyboard interrupt gracefully
+  // The watcher runs on a different thread
+  // Function calls doesn't require a while loop
+
+  // let path = Path::new(".");
+  // let mut files = Vec::new();
+  // visit(path, &mut |e| files.push(e)).unwrap();
+  // for file in files { println!("{:?}", file); }
 }
 
 fn main() {
   // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
-  // Is there a better way to implement this
+  // Is there a better way to implement this?
   if args.len() == 2 && args[1] == "init" {
     init().unwrap();
   } else if args.len() == 3 {
@@ -107,7 +122,7 @@ fn main() {
       return
     }
   } else if args.len() == 4 {
-    if args[1] == "run" &&  (args[3] == "--watch" || args[3] == "-w") {
+    if args[1] == "run" &&  ( args[3] == "--watch" || args[3] == "-w" ) {
       run(&args[2], true)
     } else {
       print_usage();
@@ -117,15 +132,4 @@ fn main() {
     print_usage();
     return;
   }
-
-  // TODO
-  // handle keyboard interrupt gracefully
-  // The watcher runs on a different thread
-  // Function calls doesn't require a while loop
-
-  // let path = Path::new(".");
-  // let mut files = Vec::new();
-  // visit(path, &mut |e| files.push(e)).unwrap();
-  // for file in files { println!("{:?}", file); }
-
 }
