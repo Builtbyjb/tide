@@ -1,14 +1,8 @@
-use std::{ fs, path::{Path, PathBuf}, io::Result };
+use std::{ fs, path::{Path, PathBuf}, io::Result, env };
+
 //serde: parsing .toml
 // toml: creating .toml
 // tokio: async
-
-/*
-  TODO:
-  * create a tide.toml file in programs root dir
-  * parse the tide.toml file
-  * the commands concurrently
-*/
 
 /* ##### Sample tide.toml config #####
 root_dir = "."
@@ -24,11 +18,21 @@ file = []
 ext = []
 */
 
-// fn print_usage() {}
+fn print_usage() {
+  let usage = r#" 
+    Usage: 
+      To create a configuration file -> ./tide init
+      To run a command in the commands table -> ./tide run [command]
+      To exit -> CTRL + C
+  "#;
 
-// fn init() {
+  println!("{}", usage)
+}
 
-// }
+// Initialize tide by creating a tide.toml file in the projects root dir
+fn init() {
+  println!("tide.toml file created")
+}
 
 fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
   for e in fs::read_dir(path)? {
@@ -43,7 +47,7 @@ fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
   Ok(())
 }
 
-fn run(cmd:String) {
+fn run(cmd:&String) {
   let styled_name = r#"
        __   _      __    
       / /_ (_)____/ /___ 
@@ -57,12 +61,25 @@ fn run(cmd:String) {
 }
 
 fn main() {
-  run(String::from("dev"));
+  // Get command line arguments
+  let args: Vec<String> = env::args().collect();
+
+  if args.len() == 2 && args[1] == "init" {
+    init()
+  } else if args.len() == 3 && args[1] == "run" {
+    run(&args[2]);
+  } else {
+    print_usage();
+    return
+  }
+
+  // TODO
+  // handle keyboard interrupt gracefully
+  // The watcher runs on a different thread
+  // Function calls doesn't require a while loop
 
   let path = Path::new(".");
   let mut files = Vec::new();
   visit(path, &mut |e| files.push(e)).unwrap();
-  for file in files {
-    println!("{:?}", file);
-  }
+  for file in files { println!("{:?}", file); }
 }
