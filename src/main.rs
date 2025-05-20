@@ -97,7 +97,18 @@ fn watcher(path:&Path, dir:&Vec<String>, file:&Vec<String>, ext:&Vec<String>, fi
     if path.is_dir() && dir.contains(&path.display().to_string()) == false {
       watcher(&path, dir, file, ext, files).unwrap();
     } else if path.is_file() {
-      if ext.contains(&path.extension().unwrap().to_owned().into_string().unwrap()) == false {
+      // let path_ext = path.extension().unwrap().to_owned().into_string().unwrap();
+      let path_ext = match path.extension() {
+        Some(ext) => {
+          match ext.to_owned().into_string() {
+            Ok(value) => value,
+            Err(_) => "".to_string()
+          }
+        },
+        None => "".to_string(),
+      };
+
+      if ext.contains(&path_ext) == false {
         if file.contains(&path.display().to_string()) == false {
           let metadata = fs::metadata(&path);
 
@@ -106,13 +117,13 @@ fn watcher(path:&Path, dir:&Vec<String>, file:&Vec<String>, ext:&Vec<String>, fi
             match files.get(&path) {
               Some(value) => {
                 if value.to_owned() != time_secs {
-                  files.insert(path.clone(),time_secs);
+                  files.insert(path.clone(), time_secs);
                   // Re run commands
                   println!("{:#?} as been modified at {:#?}", path, time)
                 }
               },
               None => {
-                files.insert(path.clone(),time_secs);
+                files.insert(path.clone(), time_secs);
                 println!("{:#?} as been modified at {:#?}", path, time)
                 // Run commands
               }
