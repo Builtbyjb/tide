@@ -1,6 +1,9 @@
 # Tide
 
 ## Documentation
+** Warning: do not work on windows machines **
+Support for windows machines would come at a later date.
+
 Run *tide init* to create a tide.toml file.
 
 *tide run [command]* to run a list of commands assigned to variable ("dev", "prod", "test") in 

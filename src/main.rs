@@ -1,23 +1,20 @@
 use std::env ;
 use std::fs;
-// use std::io::{BufRead, BufReader, Result};
 use std::io::Result;
-// use std::panic::PanicHookInfo;
 use std:: path::{Path, PathBuf}; 
-// use std::process::{exit, Command, Stdio};
-use std::process::exit;
-// use std::sync::mpsc;
 use std::thread;
 use std::time::{UNIX_EPOCH, Duration};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use toml;
-
-// tokio: async
+use tokio::process::{Command, Child};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::signal;
+use tokio::sync::mpsc;
 
 // TODO: proper error handling
 // TODO: Character case should not matter
-// TODO: Allow uses to add commands and edit default command names
+// TODO: Allow users to add commands and edit default command names
 // TODO: Add support for windows machines
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -39,6 +36,85 @@ struct Exclude {
   dir:Vec<String>,
   file:Vec<String>,
   ext:Vec<String>,
+}
+
+struct Process {
+  child: Child,
+  cmd: String,
+}
+
+struct ProcessManager {
+  processes: Vec<Process>
+}
+
+impl ProcessManager {
+  fn new() -> Self {
+    ProcessManager { processes: Vec::new(), }
+  }
+
+  async fn kill_all(&mut self) {
+    if self.processes.len() > 0 {
+      println!("Shuting down commands");
+      let mut processes = std::mem::take(&mut self.processes);
+      for mut process in processes.drain(..) {
+        let cmd = process.cmd.clone();
+        match process.child.kill().await{
+          Ok(_) => println!("shutdown: {}", cmd),
+          Err(_) => println!("Failed to shutdown {}", cmd)
+        }
+      }
+    }
+  }
+
+  async fn spawn_cmds(&mut self, cmds:&Vec<String>) {
+    // Clear any existing process
+    self.kill_all().await;
+
+    for cmd in cmds {
+      let process = self.spawn_cmd(cmd.to_owned()).await;
+      self.processes.push(process)
+    }
+  }
+
+  async fn spawn_cmd(&mut self, cmd:String) -> Process {
+
+    // #[cfg(unix)]
+    let (shell, shell_arg) = ("sh", "-c");
+    // #[cfg(windows)]
+    // let (shell, shell_arg) = ("cmd", "/C");
+
+    let mut child = Command::new(shell)
+      .arg(shell_arg)
+      .arg(&cmd)
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::piped())
+      .spawn()
+      .expect(&format!("Failed to start command: {}", &cmd));
+
+    // Capture stdout
+    if let Some(stdout) = child.stdout.take() {
+      let label = cmd.clone();
+      tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+          println!("[{}] STDOUT: {}", label, line);
+        }
+      });
+    }
+
+    // Capture stderr
+    if let Some(stderr) = child.stderr.take() {
+      let label = cmd.clone();
+      tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+          eprintln!("[{}] STDERR: {}", label, line);
+        }
+      });
+    }
+
+    Process{child, cmd}
+  }
 }
 
 fn print_usage() {
@@ -81,24 +157,32 @@ fn init() -> Result<()> {
   }
 }
 
-// Parse command string into list
-// fn parse_cmd(cmd:&String) -> Vec<String> {
-//   println!("{}", cmd);
-
-//   return [].to_vec()
-// }
-
-// TODO: run commands
-fn run(cmds:&Vec<String>) -> Result<()> {
-  for c in cmds {
-    println!("{}", c)
-  }
-  println!("");
-
-  // Exit previous running processes if any
-
+// Run commands
+async fn run(cmds:&Vec<String>) {
+  let mut processes = ProcessManager::new();
   // Run new processes
-  Ok(())
+  processes.spawn_cmds(cmds).await;
+
+
+  // Setup shutdown signal
+  let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+
+  // Ctrl+C handle
+  tokio::spawn(async move {
+    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+    shutdown_tx.send(()).await.expect("Failed to send shutdown signal");
+  });
+
+  // Wait for shutdown signal
+  shutdown_rx.recv().await;
+
+  println!("Received shutdown signal! Shutting down gracefully...");
+   
+  // Clear all processes
+  processes.kill_all().await;
+   
+  println!("Cleanup complete!!!");
+  std::process::exit(1)
 }
 
 // Watcher function
@@ -156,7 +240,7 @@ fn watcher(
   init_run
 }
 
-fn start(cmd:&String, watch:bool) {
+async fn start(cmd:&String, watch:bool) {
   // Open config file
   let toml_str = fs::read_to_string("tide.toml").unwrap();
   
@@ -173,7 +257,7 @@ fn start(cmd:&String, watch:bool) {
     cmds = toml_config.command.test
   } else {
     println!("Run value not in commands");
-    exit(1)
+    std::process::exit(1)
   }
 
   let styled_name = r#"
@@ -201,7 +285,7 @@ fn start(cmd:&String, watch:bool) {
       );
 
       if should_run { 
-        run(&cmds).unwrap() 
+        run(&cmds).await;
       }
 
       // Sleep for 100ms
@@ -209,11 +293,12 @@ fn start(cmd:&String, watch:bool) {
     }
   } else {
     // Run command without watching for file changes
-    run(&cmds).unwrap()
+    run(&cmds).await;
   }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
   // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
@@ -222,20 +307,20 @@ fn main() {
     init().unwrap();
   } else if args.len() == 3 {
     if args[1] == "run" {
-      start(&args[2], false)
+      start(&args[2], false).await;
     } else {
       print_usage();
-      return
+      return ()
     }
   } else if args.len() == 4 {
     if args[1] == "run" &&  ( args[3] == "--watch" || args[3] == "-w" ) {
-      start(&args[2], true)
+      start(&args[2], true).await;
     } else {
       print_usage();
-      return
+      return ()
     }
   } else {
     print_usage();
-    return;
+    return ();
   }
 }
