@@ -1,4 +1,15 @@
-use std::{ fs, path::{Path, PathBuf}, io::Result, env };
+use std::env ;
+use std::fs;
+// use std::io::{BufRead, BufReader, Result};
+use std::io::Result;
+// use std::panic::PanicHookInfo;
+use std:: path::{Path, PathBuf}; 
+// use std::process::{exit, Command, Stdio};
+use std::process::exit;
+// use std::sync::mpsc;
+use std::thread;
+use std::time::{UNIX_EPOCH, Duration};
+use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use toml;
 
@@ -6,16 +17,17 @@ use toml;
 
 // TODO: proper error handling
 // TODO: Character case should not matter
+// TODO: Allow uses to add commands and edit default command names
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
   root_dir:String,
-  command:Command,
+  command:Cmd,
   exclude:Exclude,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Command {
+struct Cmd {
   dev:Vec<String>,
   prod:Vec<String>,
   test:Vec<String>
@@ -41,37 +53,73 @@ fn print_usage() {
 
 // Initialize tide by creating a tide.toml file in the projects root dir
 fn init() -> Result<()> {
-  // TODO: Check if tide.toml file exists and create a new one if not
-  let config = Config {
-    root_dir: ".".to_string(),
-    command: Command {
-      dev: vec![],
-      prod: vec![],
-      test: vec![]
-
+  match fs::read_to_string("tide.toml") {
+    Ok(_) => {
+      println!("tide.toml file exists");
+      return Ok(())
     },
-    exclude: Exclude { 
-      dir: vec![String::from(".git") ], 
-      file: vec![String::from("README.md"), String::from("LICENSE.md")], 
-      ext:vec![] 
+    Err(_) => {
+      let config = Config {
+      root_dir: ".".to_string(),
+      command: Cmd {
+        dev: vec![],
+        prod: vec![],
+        test: vec![]
+      },
+      exclude: Exclude { 
+        dir: vec![String::from(".git") ], 
+        file: vec![String::from("README.md"), String::from("LICENSE.md")], 
+        ext:vec![] 
+      }
+    };
+    let toml_str = toml::to_string_pretty(&config).unwrap();
+    fs::write("tide.toml", toml_str).unwrap();
+
+    return Ok(())
     }
-  };
-
-  let toml_str = toml::to_string_pretty(&config).unwrap();
-  fs::write("tide.toml", toml_str).unwrap();
-
-  Ok(())
+  }
 }
 
+// Parse command string into list
+// fn parse_cmd(cmd:&String) -> Vec<String> {
+//   println!("{}", cmd);
+
+//   return [].to_vec()
+// }
+
 // Watcher function
-fn visit(path: &Path, cb: &mut dyn FnMut(PathBuf)) -> Result<()> {
+// Is this a sign of bad software design?
+fn watcher(path:&Path, dir:&Vec<String>, file:&Vec<String>, ext:&Vec<String>, files:&mut HashMap<PathBuf, u64>) -> Result<()> {
   for e in fs::read_dir(path)? {
-    let e = e?;
+    let e = e.unwrap();
     let path = e.path();
-    if path.is_dir() {
-      visit(&path, cb)?;
+
+    if path.is_dir() && dir.contains(&path.display().to_string()) == false {
+      watcher(&path, dir, file, ext, files).unwrap();
     } else if path.is_file() {
-      cb(path);
+      if ext.contains(&path.extension().unwrap().to_owned().into_string().unwrap()) == false {
+        if file.contains(&path.display().to_string()) == false {
+          let metadata = fs::metadata(&path);
+
+          if let Ok(time) = metadata.unwrap().modified() { // The last time the file was modified
+            let time_secs = time.duration_since(UNIX_EPOCH).unwrap().as_secs();
+            match files.get(&path) {
+              Some(value) => {
+                if value.to_owned() != time_secs {
+                  files.insert(path.clone(),time_secs);
+                  // Re run commands
+                  println!("{:#?} as been modified at {:#?}", path, time)
+                }
+              },
+              None => {
+                files.insert(path.clone(),time_secs);
+                println!("{:#?} as been modified at {:#?}", path, time)
+                // Run commands
+              }
+            }
+          }
+        }
+      }
     }
   }
   Ok(())
@@ -84,7 +132,19 @@ fn run(cmd:&String, watch:bool) {
   // Parse toml file to config
   let toml_config:Config = toml::from_str(&toml_str).unwrap();
 
-  // check if cmd is a valid command
+  // Check if cmd is a valid command
+  let cmds:Vec<String>;
+  if cmd == "dev" {
+    cmds = toml_config.command.dev;
+  } else if cmd == "prod" {
+    cmds = toml_config.command.prod;
+  } else if cmd == "test" {
+    cmds = toml_config.command.test
+  } else {
+    println!("Run value not in commands");
+    exit(1)
+  }
+
   let styled_name = r#"
        __   _      __    
       / /_ (_)____/ /___ 
@@ -94,17 +154,29 @@ fn run(cmd:&String, watch:bool) {
   "#;
 
   println!("{}", styled_name);
-  println!("{}, {}", cmd, watch);
-  println!("{:#?}", toml_config)
-  // TODO
-  // handle keyboard interrupt gracefully
-  // The watcher runs on a different thread
-  // Function calls doesn't require a while loop
 
-  // let path = Path::new(".");
-  // let mut files = Vec::new();
-  // visit(path, &mut |e| files.push(e)).unwrap();
-  // for file in files { println!("{:?}", file); }
+  // TODO: run commands
+  println!("{:?}", cmds);
+  for c in cmds {
+    println!("{}", c)
+  }
+
+  if watch { 
+    // Hashmap to store file edit time
+    let mut files:HashMap<PathBuf, u64> = HashMap::new();
+
+    println!("Watching...");
+    let path = Path::new(&toml_config.root_dir);
+    loop {
+      watcher(path, &toml_config.exclude.dir, &toml_config.exclude.file, &toml_config.exclude.ext, &mut files).unwrap();
+
+      // Sleep for 100ms
+      thread::sleep(Duration::from_millis(100))
+    }
+  } else {
+    // Run command onces
+    println!("Running commands without watching")
+  }
 }
 
 fn main() {

@@ -1,3 +1,6 @@
 /target
 .vscode
 tide.toml
+/test
+log.txt
+/.mypy_cache
