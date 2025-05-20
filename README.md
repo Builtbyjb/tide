@@ -14,7 +14,7 @@ You can configure how tide works by editing the tide.toml configuration file.
 
 The file contains a variable and two tables.
 
-The variable **root_dir** sets the starting point of the directories *tide* is will watch.
+The variable **root_dir** sets the starting point of the directories *tide* will watch.
 
 The table **[command]** contains three variables:
 **dev** -> a list of all the commands to run in a development environment.

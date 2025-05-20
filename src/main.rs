@@ -93,6 +93,7 @@ fn run(cmds:&Vec<String>) -> Result<()> {
   for c in cmds {
     println!("{}", c)
   }
+  println!("");
 
   // Exit previous running processes if any
 
@@ -101,14 +102,21 @@ fn run(cmds:&Vec<String>) -> Result<()> {
 }
 
 // Watcher function
-// Is this a sign of bad software design?
-fn watcher(path:&Path, dir:&Vec<String>, file:&Vec<String>, ext:&Vec<String>, files:&mut HashMap<PathBuf, u64>) -> bool {
-  for e in fs::read_dir(path).unwrap() {
+// Is this a sign of bad software design
+fn watcher(
+  r_path:&Path, 
+  ignore_dirs:&Vec<String>, 
+  ignore_files:&Vec<String>, 
+  ignore_exts:&Vec<String>, 
+  files:&mut HashMap<PathBuf, u64>
+) -> bool {
+  let mut init_run = false;
+  for e in fs::read_dir(r_path).unwrap() {
     let e = e.unwrap();
     let path = e.path();
 
-    if path.is_dir() && dir.contains(&path.display().to_string()) == false {
-      watcher(&path, dir, file, ext, files);
+    if path.is_dir() && ignore_dirs.contains(&path.display().to_string()) == false {
+      if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) { init_run = true }
     } else if path.is_file() {
       let path_ext = match path.extension() {
         Some(ext) => {
@@ -120,32 +128,32 @@ fn watcher(path:&Path, dir:&Vec<String>, file:&Vec<String>, ext:&Vec<String>, fi
         None => "".to_string(),
       };
 
-      if ext.contains(&path_ext) == false {
-        if file.contains(&path.display().to_string()) == false {
+      if ignore_exts.contains(&path_ext) == false {
+        if ignore_files.contains(&path.display().to_string()) == false {
           let metadata = fs::metadata(&path);
 
           if let Ok(time) = metadata.unwrap().modified() { // The last time the file was modified
             let time_secs = time.duration_since(UNIX_EPOCH).unwrap().as_secs();
             match files.get(&path) {
               Some(value) => {
-                if value.to_owned() != time_secs {
+                if *value != time_secs {
                   files.insert(path.clone(), time_secs);
-                  println!("{:#?} as been modified at {:#?}", path, time);
-                  return true;
+                  println!("{:#?} as been modified", &path);
+                  init_run = true;
                 }
               },
               None => {
                 files.insert(path.clone(), time_secs);
-                println!("{:#?} as been modified at {:#?}", path, time);
-                return true;
-              }
+                // println!("{:#?} as been modified at {:#?}", path, time);
+                init_run = true
+              },
             }
           }
         }
       }
     }
   }
-  false
+  init_run
 }
 
 fn start(cmd:&String, watch:bool) {
@@ -192,7 +200,10 @@ fn start(cmd:&String, watch:bool) {
         &mut files
       );
 
-      if should_run { run(&cmds).unwrap() }
+      if should_run { 
+        run(&cmds).unwrap() 
+      }
+
       // Sleep for 100ms
       thread::sleep(Duration::from_millis(100))
     }
