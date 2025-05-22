@@ -21,7 +21,7 @@ Re runs the commands in the *dev* variable every time a file is modified
 ./tide run dev --watch 
 ```
 
-### Tide Config
+### Tide Configuration
 You can configure how tide works by editing the tide.toml configuration file.
 
 The variable **root_dir** sets the starting point of the directories *tide* will watch.

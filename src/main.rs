@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::Result;
 use std::path::{Path, PathBuf};
+use std::result::Result;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -12,7 +12,6 @@ use tokio::signal;
 use tokio::sync::mpsc;
 use toml;
 
-// TODO: proper error handling
 // TODO: Character case should not matter
 // TODO: Allow users to add commands and edit default command names
 // TODO: Add support for windows machines
@@ -121,23 +120,39 @@ impl ProcessManager {
 
 fn print_usage() {
   let usage = r#"
-  Usage:
-    To create a configuration file -> ./tide init
-    To run a command in the commands table -> ./tide run [command]
-    For live reload -> ./tide run [command] --watch
-    To exit -> CTRL + C
-  "#;
+        Usage:
+          To create a configuration file -> ./tide init
+          To run a command in the commands table -> ./tide run [command]
+          For live reload -> ./tide run [command] --watch
+          To exit -> CTRL + C
+        "#;
   println!("{}", usage)
 }
 
+#[derive(Debug)]
+enum ConfigError {
+  IOError(std::io::Error),
+  TomlError(toml::ser::Error),
+}
+
+impl std::fmt::Display for ConfigError {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    match self {
+      ConfigError::IOError(err) => write!(f, "IOError: {}", err),
+      ConfigError::TomlError(err) => write!(f, "TomlError: {}", err),
+    }
+  }
+}
+
 // Initialize tide by creating a tide.toml file in the projects root dir
-fn init() -> Result<()> {
+fn init() -> Result<(), ConfigError> {
   match fs::read_to_string("tide.toml") {
     Ok(_) => {
       println!("tide.toml file exists");
       return Ok(());
     }
     Err(_) => {
+      // Create tide config file
       let config = Config {
         root_dir: ".".to_string(),
         command: Cmd {
@@ -151,10 +166,16 @@ fn init() -> Result<()> {
           ext: vec![],
         },
       };
-      let toml_str = toml::to_string_pretty(&config).unwrap();
-      fs::write("tide.toml", toml_str).unwrap();
 
-      return Ok(());
+      let toml_str = match toml::to_string_pretty(&config) {
+        Ok(value) => value,
+        Err(e) => return Err(ConfigError::TomlError(e)),
+      };
+
+      match fs::write("tide.toml", toml_str) {
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(ConfigError::IOError(e)),
+      };
     }
   }
 }
@@ -190,56 +211,66 @@ async fn run(cmds: &Vec<String>) {
 }
 
 // Watcher function
-// Is this a sign of bad software design
 fn watcher(
-  r_path: &Path,
+  root_path: &Path,
   ignore_dirs: &Vec<String>,
   ignore_files: &Vec<String>,
   ignore_exts: &Vec<String>,
   files: &mut HashMap<PathBuf, u64>,
 ) -> bool {
   let mut init_run = false;
-  for e in fs::read_dir(r_path).unwrap() {
-    let e = e.unwrap();
-    let path = e.path();
+  match fs::read_dir(root_path) {
+    Ok(entries) => {
+      for e in entries {
+        let path = e.expect("Invalid entry").path();
 
-    if path.is_dir() && ignore_dirs.contains(&path.display().to_string()) == false {
-      if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) {
-        init_run = true
-      }
-    } else if path.is_file() {
-      let path_ext = match path.extension() {
-        Some(ext) => match ext.to_owned().into_string() {
-          Ok(value) => value,
-          Err(_) => "".to_string(),
-        },
-        None => "".to_string(),
-      };
+        if path.is_dir() && ignore_dirs.contains(&path.display().to_string()) == false {
+          if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) {
+            init_run = true
+          }
+        } else if path.is_file() {
+          let path_ext = match path.extension() {
+            Some(ext) => match ext.to_owned().into_string() {
+              Ok(value) => value,
+              Err(_) => "".to_string(),
+            },
+            None => "".to_string(),
+          };
 
-      if ignore_exts.contains(&path_ext) == false {
-        if ignore_files.contains(&path.display().to_string()) == false {
-          let metadata = fs::metadata(&path);
+          if ignore_exts.contains(&path_ext) == false {
+            if ignore_files.contains(&path.display().to_string()) == false {
+              let metadata = fs::metadata(&path);
 
-          if let Ok(time) = metadata.unwrap().modified() {
-            // The last time the file was modified
-            let time_secs = time.duration_since(UNIX_EPOCH).unwrap().as_secs();
-            match files.get(&path) {
-              Some(value) => {
-                if *value != time_secs {
-                  files.insert(path.clone(), time_secs);
-                  println!("{:#?} as been modified", &path);
-                  init_run = true;
+              if let Ok(time) = metadata.expect("Error getting file metadata").modified() {
+                // The last time the file was modified
+                let time_secs = time
+                  .duration_since(UNIX_EPOCH)
+                  .expect("Error getting system time")
+                  .as_secs();
+
+                match files.get(&path) {
+                  Some(value) => {
+                    if *value != time_secs {
+                      files.insert(path.clone(), time_secs);
+                      println!("{:#?} as been modified", &path);
+                      init_run = true;
+                    }
+                  }
+                  None => {
+                    files.insert(path.clone(), time_secs);
+                    // println!("{:#?} as been modified at {:#?}", path, time);
+                    init_run = true
+                  }
                 }
-              }
-              None => {
-                files.insert(path.clone(), time_secs);
-                // println!("{:#?} as been modified at {:#?}", path, time);
-                init_run = true
               }
             }
           }
         }
       }
+    }
+    Err(_) => {
+      eprintln!("Error reading directory entries");
+      std::process::exit(1)
     }
   }
   init_run
@@ -247,10 +278,22 @@ fn watcher(
 
 async fn start(cmd: &String, watch: bool) {
   // Open config file
-  let toml_str = fs::read_to_string("tide.toml").unwrap();
+  let toml_str = match fs::read_to_string("tide.toml") {
+    Ok(value) => value,
+    Err(_) => {
+      eprintln!("Error reading config file");
+      return;
+    }
+  };
 
   // Parse toml file to config
-  let toml_config: Config = toml::from_str(&toml_str).unwrap();
+  let toml_config: Config = match toml::from_str(&toml_str) {
+    Ok(value) => value,
+    Err(_) => {
+      eprintln!("Error parsing config file");
+      return;
+    }
+  };
 
   // Check if cmd is a valid command
   let cmds: Vec<String>;
@@ -261,7 +304,7 @@ async fn start(cmd: &String, watch: bool) {
   } else if cmd == "test" {
     cmds = toml_config.command.test
   } else {
-    println!("Run value not in commands");
+    eprintln!("Run value not in commands");
     std::process::exit(1)
   }
 
@@ -307,9 +350,14 @@ async fn main() {
   // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
-  // Is there a better way to implement this?
   if args.len() == 2 && args[1] == "init" {
-    init().unwrap();
+    match init() {
+      Ok(_) => return,
+      Err(e) => {
+        eprintln!("Error creating a toml configuration file: {:#?}", e);
+        return;
+      }
+    };
   } else if args.len() == 3 {
     if args[1] == "run" {
       start(&args[2], false).await;
