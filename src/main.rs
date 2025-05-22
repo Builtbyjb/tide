@@ -1,41 +1,42 @@
-use std::env ;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::io::Result;
-use std:: path::{Path, PathBuf}; 
+use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{UNIX_EPOCH, Duration};
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use toml;
-use tokio::process::{Command, Child};
+use std::time::{Duration, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
+use toml;
 
 // TODO: proper error handling
 // TODO: Character case should not matter
 // TODO: Allow users to add commands and edit default command names
 // TODO: Add support for windows machines
+// TODO: Add ability to map file extensions to commands
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
-  root_dir:String,
-  command:Cmd,
-  exclude:Exclude,
+  root_dir: String,
+  command: Cmd,
+  exclude: Exclude,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Cmd {
-  dev:Vec<String>,
-  prod:Vec<String>,
-  test:Vec<String>
+  dev: Vec<String>,
+  prod: Vec<String>,
+  test: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Exclude {
-  dir:Vec<String>,
-  file:Vec<String>,
-  ext:Vec<String>,
+  dir: Vec<String>,
+  file: Vec<String>,
+  ext: Vec<String>,
 }
 
 struct Process {
@@ -44,12 +45,14 @@ struct Process {
 }
 
 struct ProcessManager {
-  processes: Vec<Process>
+  processes: Vec<Process>,
 }
 
 impl ProcessManager {
   fn new() -> Self {
-    ProcessManager { processes: Vec::new(), }
+    ProcessManager {
+      processes: Vec::new(),
+    }
   }
 
   async fn kill_all(&mut self) {
@@ -58,15 +61,15 @@ impl ProcessManager {
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
         let cmd = process.cmd.clone();
-        match process.child.kill().await{
+        match process.child.kill().await {
           Ok(_) => println!("shutdown: {}", cmd),
-          Err(_) => println!("Failed to shutdown {}", cmd)
+          Err(_) => println!("Failed to shutdown {}", cmd),
         }
       }
     }
   }
 
-  async fn spawn_cmds(&mut self, cmds:&Vec<String>) {
+  async fn spawn_cmds(&mut self, cmds: &Vec<String>) {
     // Clear any existing process
     self.kill_all().await;
 
@@ -76,8 +79,7 @@ impl ProcessManager {
     }
   }
 
-  async fn spawn_cmd(&mut self, cmd:String) -> Process {
-
+  async fn spawn_cmd(&mut self, cmd: String) -> Process {
     // #[cfg(unix)]
     let (shell, shell_arg) = ("sh", "-c");
     // #[cfg(windows)]
@@ -113,17 +115,17 @@ impl ProcessManager {
       });
     }
 
-    Process{child, cmd}
+    Process { child, cmd }
   }
 }
 
 fn print_usage() {
-  let usage = r#" 
-    Usage: 
-      To create a configuration file -> ./tide init
-      To run a command in the commands table -> ./tide run [command]
-      For live reload -> ./tide run [command] --watch
-      To exit -> CTRL + C
+  let usage = r#"
+  Usage:
+    To create a configuration file -> ./tide init
+    To run a command in the commands table -> ./tide run [command]
+    For live reload -> ./tide run [command] --watch
+    To exit -> CTRL + C
   "#;
   println!("{}", usage)
 }
@@ -133,36 +135,35 @@ fn init() -> Result<()> {
   match fs::read_to_string("tide.toml") {
     Ok(_) => {
       println!("tide.toml file exists");
-      return Ok(())
-    },
+      return Ok(());
+    }
     Err(_) => {
       let config = Config {
-      root_dir: ".".to_string(),
-      command: Cmd {
-        dev: vec![],
-        prod: vec![],
-        test: vec![]
-      },
-      exclude: Exclude { 
-        dir: vec![String::from(".git") ], 
-        file: vec![String::from("README.md"), String::from("LICENSE.md")], 
-        ext:vec![] 
-      }
-    };
-    let toml_str = toml::to_string_pretty(&config).unwrap();
-    fs::write("tide.toml", toml_str).unwrap();
+        root_dir: ".".to_string(),
+        command: Cmd {
+          dev: vec![],
+          prod: vec![],
+          test: vec![],
+        },
+        exclude: Exclude {
+          dir: vec![String::from("./.git")],
+          file: vec![],
+          ext: vec![],
+        },
+      };
+      let toml_str = toml::to_string_pretty(&config).unwrap();
+      fs::write("tide.toml", toml_str).unwrap();
 
-    return Ok(())
+      return Ok(());
     }
   }
 }
 
 // Run commands
-async fn run(cmds:&Vec<String>) {
+async fn run(cmds: &Vec<String>) {
   let mut processes = ProcessManager::new();
   // Run new processes
   processes.spawn_cmds(cmds).await;
-
 
   // Setup shutdown signal
   let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
@@ -170,17 +171,20 @@ async fn run(cmds:&Vec<String>) {
   // Ctrl+C handle
   tokio::spawn(async move {
     signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    shutdown_tx.send(()).await.expect("Failed to send shutdown signal");
+    shutdown_tx
+      .send(())
+      .await
+      .expect("Failed to send shutdown signal");
   });
 
   // Wait for shutdown signal
   shutdown_rx.recv().await;
 
   println!("Received shutdown signal! Shutting down gracefully...");
-   
+
   // Clear all processes
   processes.kill_all().await;
-   
+
   println!("Cleanup complete!!!");
   std::process::exit(1)
 }
@@ -188,11 +192,11 @@ async fn run(cmds:&Vec<String>) {
 // Watcher function
 // Is this a sign of bad software design
 fn watcher(
-  r_path:&Path, 
-  ignore_dirs:&Vec<String>, 
-  ignore_files:&Vec<String>, 
-  ignore_exts:&Vec<String>, 
-  files:&mut HashMap<PathBuf, u64>
+  r_path: &Path,
+  ignore_dirs: &Vec<String>,
+  ignore_files: &Vec<String>,
+  ignore_exts: &Vec<String>,
+  files: &mut HashMap<PathBuf, u64>,
 ) -> bool {
   let mut init_run = false;
   for e in fs::read_dir(r_path).unwrap() {
@@ -200,14 +204,14 @@ fn watcher(
     let path = e.path();
 
     if path.is_dir() && ignore_dirs.contains(&path.display().to_string()) == false {
-      if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) { init_run = true }
+      if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) {
+        init_run = true
+      }
     } else if path.is_file() {
       let path_ext = match path.extension() {
-        Some(ext) => {
-          match ext.to_owned().into_string() {
-            Ok(value) => value,
-            Err(_) => "".to_string()
-          }
+        Some(ext) => match ext.to_owned().into_string() {
+          Ok(value) => value,
+          Err(_) => "".to_string(),
         },
         None => "".to_string(),
       };
@@ -216,7 +220,8 @@ fn watcher(
         if ignore_files.contains(&path.display().to_string()) == false {
           let metadata = fs::metadata(&path);
 
-          if let Ok(time) = metadata.unwrap().modified() { // The last time the file was modified
+          if let Ok(time) = metadata.unwrap().modified() {
+            // The last time the file was modified
             let time_secs = time.duration_since(UNIX_EPOCH).unwrap().as_secs();
             match files.get(&path) {
               Some(value) => {
@@ -225,12 +230,12 @@ fn watcher(
                   println!("{:#?} as been modified", &path);
                   init_run = true;
                 }
-              },
+              }
               None => {
                 files.insert(path.clone(), time_secs);
                 // println!("{:#?} as been modified at {:#?}", path, time);
                 init_run = true
-              },
+              }
             }
           }
         }
@@ -240,15 +245,15 @@ fn watcher(
   init_run
 }
 
-async fn start(cmd:&String, watch:bool) {
+async fn start(cmd: &String, watch: bool) {
   // Open config file
   let toml_str = fs::read_to_string("tide.toml").unwrap();
-  
+
   // Parse toml file to config
-  let toml_config:Config = toml::from_str(&toml_str).unwrap();
+  let toml_config: Config = toml::from_str(&toml_str).unwrap();
 
   // Check if cmd is a valid command
-  let cmds:Vec<String>;
+  let cmds: Vec<String>;
   if cmd == "dev" {
     cmds = toml_config.command.dev;
   } else if cmd == "prod" {
@@ -261,30 +266,30 @@ async fn start(cmd:&String, watch:bool) {
   }
 
   let styled_name = r#"
-       __   _      __    
-      / /_ (_)____/ /___ 
-     / __// // __  // _ \
-    / /_ / // /_/ //  __/
-    \__//_/ \__,_/ \___/  version: 0.1.0.
+     __   _      __
+    / /_ (_)____/ /___
+   / __// // __  // _ \
+  / /_ / // /_/ //  __/
+  \__//_/ \__,_/ \___/  version: 0.1.0.
   "#;
 
   println!("{}", styled_name);
 
-  if watch { 
+  if watch {
     // Hashmap to store file edit time
-    let mut files:HashMap<PathBuf, u64> = HashMap::new();
+    let mut files: HashMap<PathBuf, u64> = HashMap::new();
     println!("Watching...");
     let path = Path::new(&toml_config.root_dir);
     loop {
       let should_run = watcher(
-        path, 
-        &toml_config.exclude.dir, 
-        &toml_config.exclude.file, 
-        &toml_config.exclude.ext, 
-        &mut files
+        path,
+        &toml_config.exclude.dir,
+        &toml_config.exclude.file,
+        &toml_config.exclude.ext,
+        &mut files,
       );
 
-      if should_run { 
+      if should_run {
         run(&cmds).await;
       }
 
@@ -310,14 +315,14 @@ async fn main() {
       start(&args[2], false).await;
     } else {
       print_usage();
-      return ()
+      return ();
     }
   } else if args.len() == 4 {
-    if args[1] == "run" &&  ( args[3] == "--watch" || args[3] == "-w" ) {
+    if args[1] == "run" && (args[3] == "--watch" || args[3] == "-w") {
       start(&args[2], true).await;
     } else {
       print_usage();
-      return ()
+      return ();
     }
   } else {
     print_usage();

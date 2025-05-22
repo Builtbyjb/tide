@@ -1,30 +1,58 @@
 # Tide
 
-## Documentation
-** Warning: do not work on windows machines **
-Support for windows machines would come at a later date.
+[!WARNING] Windows machines are not currently supported. Support for windows machines would come at a later date.
 
-Run *tide init* to create a tide.toml file.
+Tide is a cli program the helps run multiple commands concurrently.
 
-*tide run [command]* to run a list of commands assigned to variable ("dev", "prod", "test") in 
-command table.
+### Commands
 
-*tide run [command] --watch* to run the commands in watch mode. *tide* monitors the project for file
-changes and re runs the commands when the file changes.
+Create a tide configuration file.
+```bash
+./tide init 
+```
+
+Runs the list of commands assigned to the *dev* variable under the command table. The command table contains three variables *dev*, *prod*, and *test*
+```bash
+./tide run dev 
+```
+
+Re runs the commands in the *dev* variable every time a file is modified
+```bash
+./tide run dev --watch 
+```
 
 ### Tide Config
 You can configure how tide works by editing the tide.toml configuration file.
 
-The file contains a variable and two tables.
-
 The variable **root_dir** sets the starting point of the directories *tide* will watch.
 
 The table **[command]** contains three variables:
-**dev** -> a list of all the commands to run in a development environment.
-**prod** -> a list of all the commands to run in a production environment.
-**test** -> a list of all the commands to run tests.
++ **dev**: A list of all the commands to run in a development environment.
++ **prod**: A list of all the commands to run in a production environment.
++ **test**: A list of all the commands to run tests.
 
 The table **[exclude]** contains three variables:
-**dir** -> a list of directories *tide* should not watch.
-**file** -> a list of files *tide* should not watch.
-**ext** -> a list of file extensions *tide* should not watch.
++ **dir**: A list of directories *tide* should not watch.
++ **file**: A list of files *tide* should not watch.
++ **ext**: A list of file extensions *tide* should not watch.
+
+#### Example configuration
+```toml
+root_dir = "."
+
+[command]
+dev = [
+  "python3 main.py", 
+  "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --minify", 
+]
+prod = []
+test = []
+
+[exclude]
+dir = ["./.git", "./node_modules", "./.mypy_cache", "./.vscode"]
+file = [ "README.md"]
+ext = []
+```
+
+### Installation
+Tide can only be installed by cloning the github repository and building to code using rust cargo. An installation process would be added soon.
