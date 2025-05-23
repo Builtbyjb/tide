@@ -120,12 +120,12 @@ impl ProcessManager {
 
 fn print_usage() {
   let usage = r#"
-        Usage:
-          To create a configuration file -> ./tide init
-          To run a command in the commands table -> ./tide run [command]
-          For live reload -> ./tide run [command] --watch
-          To exit -> CTRL + C
-        "#;
+    Usage:
+      To create a configuration file -> ./tide init
+      To run a command in the commands table -> ./tide run [command]
+      For live reload -> ./tide run [command] --watch
+      To exit -> CTRL + C
+    "#;
   println!("{}", usage)
 }
 
