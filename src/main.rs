@@ -104,7 +104,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          println!("[{}] {}: {}", "STDOUT".green(), label.cyan(), line);
+          println!("{}: {}", label.cyan(), line);
         }
       });
     }
@@ -115,7 +115,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          eprintln!("[{}] {}: {}", "STDERR".red(), label.blue(), line);
+          eprintln!("{}: {}", label.cyan(), line);
         }
       });
     }
