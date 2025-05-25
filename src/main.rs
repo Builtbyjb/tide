@@ -1,21 +1,16 @@
+use colored::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::result::Result;
-use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 use toml;
-
-// TODO: Character case should not matter
-// TODO: Allow users to add commands and edit default command names
-// TODO: Add support for windows machines
-// TODO: Add ability to map file extensions to commands
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -55,14 +50,24 @@ impl ProcessManager {
   }
 
   async fn kill_all(&mut self) {
+    // println!("processes len: {}", self.processes.len());
     if self.processes.len() > 0 {
-      println!("Shuting down commands");
+      println!("{}", "Shuting down commands".blue().bold());
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
-        let cmd = process.cmd.clone();
         match process.child.kill().await {
-          Ok(_) => println!("shutdown: {}", cmd),
-          Err(_) => println!("Failed to shutdown {}", cmd),
+          Ok(_) => println!(
+            "{} {} {}",
+            "✓".green(),
+            "shutdown:".green(),
+            &process.cmd.cyan()
+          ),
+          Err(_) => println!(
+            "{} {} {}",
+            "✗".red(),
+            "Failed to shutdown:".red(),
+            &process.cmd.cyan()
+          ),
         }
       }
     }
@@ -71,7 +76,8 @@ impl ProcessManager {
   async fn spawn_cmds(&mut self, cmds: &Vec<String>) {
     // Clear any existing process
     self.kill_all().await;
-
+    // println!(" spawn: processes len: {}", self.processes.len());
+    println!("{}", "Starting commands".blue().bold());
     for cmd in cmds {
       let process = self.spawn_cmd(cmd.to_owned()).await;
       self.processes.push(process)
@@ -98,7 +104,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          println!("[{}] STDOUT: {}", label, line);
+          println!("[{}] {}: {}", "STDOUT".green(), label.cyan(), line);
         }
       });
     }
@@ -109,7 +115,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          eprintln!("[{}] STDERR: {}", label, line);
+          eprintln!("[{}] {}: {}", "STDERR".red(), label.blue(), line);
         }
       });
     }
@@ -119,14 +125,21 @@ impl ProcessManager {
 }
 
 fn print_usage() {
-  let usage = r#"
-    Usage:
-      To create a configuration file -> ./tide init
-      To run a command in the commands table -> ./tide run [command]
-      For live reload -> ./tide run [command] --watch
-      To exit -> CTRL + C
-    "#;
-  println!("{}", usage)
+  let usage = format!(
+    r#"
+    {}
+      To create a configuration file -> {} init
+      To run a command in the commands table -> {} run [command]
+      For live reload -> {} run [command] --watch
+      To exit -> {} 
+    "#,
+    "Usage:".cyan().bold(),
+    "./tide".green(),
+    "./tide".green(),
+    "./tide".green(),
+    "CTRL + C".yellow()
+  );
+  println!("{}", usage);
 }
 
 #[derive(Debug)]
@@ -178,36 +191,6 @@ fn init() -> Result<(), ConfigError> {
       };
     }
   }
-}
-
-// Run commands
-async fn run(cmds: &Vec<String>) {
-  let mut processes = ProcessManager::new();
-  // Run new processes
-  processes.spawn_cmds(cmds).await;
-
-  // Setup shutdown signal
-  let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
-
-  // Ctrl+C handle
-  tokio::spawn(async move {
-    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    shutdown_tx
-      .send(())
-      .await
-      .expect("Failed to send shutdown signal");
-  });
-
-  // Wait for shutdown signal
-  shutdown_rx.recv().await;
-
-  println!("Received shutdown signal! Shutting down gracefully...");
-
-  // Clear all processes
-  processes.kill_all().await;
-
-  println!("Cleanup complete!!!");
-  std::process::exit(1)
 }
 
 // Watcher function
@@ -308,40 +291,83 @@ async fn start(cmd: &String, watch: bool) {
     std::process::exit(1)
   }
 
-  let styled_name = r#"
+  let styled_name = format!(
+    r#"{}
      __   _      __
     / /_ (_)____/ /___
    / __// // __  // _ \
   / /_ / // /_/ //  __/
-  \__//_/ \__,_/ \___/  version: 0.1.0.
-  "#;
+  \__//_/ \__,_/ \___/  version: {}"#,
+    "".blue().bold(),
+    "0.1.0".blue().bold()
+  )
+  .blue()
+  .bold();
 
-  println!("{}", styled_name);
+  println!("{}\n", styled_name);
+
+  let mut processes = ProcessManager::new();
+
+  // Setup shutdown signal
+  let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+
+  // Ctrl+C handle
+  tokio::spawn(async move {
+    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+    shutdown_tx
+      .send(())
+      .await
+      .expect("Failed to send shutdown signal");
+  });
 
   if watch {
     // Hashmap to store file edit time
     let mut files: HashMap<PathBuf, u64> = HashMap::new();
-    println!("Watching...");
+    println!("{}", "Watching...\n".green().bold());
     let path = Path::new(&toml_config.root_dir);
     loop {
-      let should_run = watcher(
-        path,
-        &toml_config.exclude.dir,
-        &toml_config.exclude.file,
-        &toml_config.exclude.ext,
-        &mut files,
-      );
+      tokio::select! {
+        // Handle file watching
+        _ = async {
+          let should_run = watcher(
+            path,
+            &toml_config.exclude.dir,
+            &toml_config.exclude.file,
+            &toml_config.exclude.ext,
+            &mut files,
+          );
 
-      if should_run {
-        run(&cmds).await;
+          if should_run {
+            processes.spawn_cmds(&cmds).await;
+          }
+
+          // Sleep for 100ms
+          tokio::time::sleep(Duration::from_millis(100)).await;
+        } => {}
+
+        // Handle shutdown signal
+        Some(_) = shutdown_rx.recv() => {
+          println!();
+          println!("{}", "Received shutdown signal!!! Shutting down gracefully...".green());
+          processes.kill_all().await;
+          println!("{}", "Shutdown complete!!!".green());
+          std::process::exit(0);
+        }
       }
-
-      // Sleep for 100ms
-      thread::sleep(Duration::from_millis(100))
     }
   } else {
     // Run command without watching for file changes
-    run(&cmds).await;
+    processes.spawn_cmds(&cmds).await;
+
+    // Shutdown handler
+    if shutdown_rx.recv().await.is_some() {
+      println!(
+        "{}",
+        "Received shutdown signal! Shutting down gracefully...".green()
+      );
+      processes.kill_all().await;
+      std::process::exit(0);
+    }
   }
 }
 
