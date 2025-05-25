@@ -4,3 +4,4 @@ tide.toml
 /test
 log.txt
 /.mypy_cache
+.DS_Store
