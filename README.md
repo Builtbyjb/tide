@@ -1,8 +1,5 @@
 # Tide
 
-> [!WARNING]
-> Windows machines are not currently supported. Support for windows machines would come at a later date.
-
 Tide is a cli program the helps run multiple commands concurrently.
 
 ### Commands

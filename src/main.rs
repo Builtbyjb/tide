@@ -1,3 +1,4 @@
+mod test;
 use colored::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,6 +12,9 @@ use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 use toml;
+
+// TODO: Fix ngrok running error
+// TODO: Upload a release to github
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -52,7 +56,7 @@ impl ProcessManager {
   async fn kill_all(&mut self) {
     // println!("processes len: {}", self.processes.len());
     if self.processes.len() > 0 {
-      println!("{}", "Shuting down commands".blue().bold());
+      println!("{}", "Shutting down commands".blue().bold());
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
         match process.child.kill().await {
@@ -85,10 +89,10 @@ impl ProcessManager {
   }
 
   async fn spawn_cmd(&mut self, cmd: String) -> Process {
-    // #[cfg(unix)]
+    #[cfg(unix)]
     let (shell, shell_arg) = ("sh", "-c");
-    // #[cfg(windows)]
-    // let (shell, shell_arg) = ("cmd", "/C");
+    #[cfg(windows)]
+    let (shell, shell_arg) = ("cmd", "/C");
 
     let mut child = Command::new(shell)
       .arg(shell_arg)
@@ -140,6 +144,25 @@ fn print_usage() {
     "CTRL + C".yellow()
   );
   println!("{}", usage);
+}
+
+fn print_title() {
+  let styled_title = format!(
+    r#"{}
+     __   _      __
+    / /_ (_)____/ /___
+   / __// // __  // _ \
+  / /_ / // /_/ //  __/
+  \__//_/ \__,_/ \___/  version: {}
+  
+ Press Crtl + C to exit"#,
+    "".blue().bold(),
+    "0.1.0".blue().bold()
+  )
+  .blue()
+  .bold();
+
+  println!("{}", styled_title)
 }
 
 #[derive(Debug)]
@@ -291,20 +314,7 @@ async fn start(cmd: &String, watch: bool) {
     std::process::exit(1)
   }
 
-  let styled_name = format!(
-    r#"{}
-     __   _      __
-    / /_ (_)____/ /___
-   / __// // __  // _ \
-  / /_ / // /_/ //  __/
-  \__//_/ \__,_/ \___/  version: {}"#,
-    "".blue().bold(),
-    "0.1.0".blue().bold()
-  )
-  .blue()
-  .bold();
-
-  println!("{}\n", styled_name);
+  print_title();
 
   let mut processes = ProcessManager::new();
 
@@ -347,8 +357,7 @@ async fn start(cmd: &String, watch: bool) {
 
         // Handle shutdown signal
         Some(_) = shutdown_rx.recv() => {
-          println!();
-          println!("{}", "Received shutdown signal!!! Shutting down gracefully...".green());
+          println!("{}", "\nReceived shutdown signal!!! Shutting down gracefully...".green());
           processes.kill_all().await;
           println!("{}", "Shutdown complete!!!".green());
           std::process::exit(0);

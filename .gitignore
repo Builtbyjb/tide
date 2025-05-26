@@ -1,7 +1,7 @@
 /target
 .vscode
 tide.toml
-/test
+/test_dir
 log.txt
 /.mypy_cache
 .DS_Store
