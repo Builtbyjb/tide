@@ -82,7 +82,7 @@ impl ProcessManager {
     // Wait for all processes to shutdown completely
     tokio::time::sleep(Duration::from_millis(1000)).await;
     // println!(" spawn: processes len: {}", self.processes.len());
-    println!("{}", "Starting commands".blue().bold());
+    println!("{}", "Starting up commands".blue().bold());
     for cmd in cmds {
       let process = self.spawn_cmd(cmd.to_owned()).await;
       self.processes.push(process)
@@ -109,7 +109,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          println!("{}: {}", label.cyan(), line);
+          println!("[{}]: {}", label.cyan(), line);
         }
       });
     }
@@ -120,7 +120,7 @@ impl ProcessManager {
       tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-          eprintln!("{}: {}", label.cyan(), line);
+          eprintln!("[{}]: {}", label.cyan(), line);
         }
       });
     }
