@@ -60,8 +60,8 @@ impl ProcessManager {
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
         match process.child.kill().await {
-          Ok(_) => println!("[{}]: {}", "shutdown:".green(), &process.cmd.cyan()),
-          Err(_) => println!("[{}]: {}", "Failed to shutdown:".red(), &process.cmd.cyan()),
+          Ok(_) => println!("[{}]: {}", "shutdown".green(), &process.cmd.cyan()),
+          Err(_) => println!("[{}]: {}", "Failed to shutdown".red(), &process.cmd.cyan()),
         }
       }
       // Wait for all processes to shutdown completely
