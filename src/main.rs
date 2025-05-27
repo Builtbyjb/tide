@@ -73,14 +73,15 @@ impl ProcessManager {
           ),
         }
       }
+      // Wait for all processes to shutdown completely
+      tokio::time::sleep(Duration::from_millis(1000)).await;
+      println!("{}", "Shutdown complete!!!".green());
     }
   }
 
   async fn spawn_cmds(&mut self, cmds: &Vec<String>) {
     // Clear any existing process
     self.kill_all().await;
-    // Wait for all processes to shutdown completely
-    tokio::time::sleep(Duration::from_millis(1000)).await;
     // println!(" spawn: processes len: {}", self.processes.len());
     println!("{}", "Starting up commands".blue().bold());
     for cmd in cmds {
@@ -360,7 +361,6 @@ async fn start(cmd: &String, watch: bool) {
         Some(_) = shutdown_rx.recv() => {
           println!("\n{}", "Received shutdown signal!!! Shutting down gracefully...".green());
           processes.kill_all().await;
-          println!("{}", "Shutdown complete!!!".green());
           std::process::exit(0);
         }
       }
@@ -376,7 +376,6 @@ async fn start(cmd: &String, watch: bool) {
         "Received shutdown signal!!! Shutting down gracefully...".green()
       );
       processes.kill_all().await;
-      println!("{}", "Shutdown complete!!!".green());
       std::process::exit(0);
     }
   }
