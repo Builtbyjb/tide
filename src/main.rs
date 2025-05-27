@@ -14,6 +14,7 @@ use tokio::sync::mpsc;
 use toml;
 
 // TODO: Upload a release to github
+// TODO: Add version check
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -59,18 +60,8 @@ impl ProcessManager {
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
         match process.child.kill().await {
-          Ok(_) => println!(
-            "{} {} {}",
-            "✓".green(),
-            "shutdown:".green(),
-            &process.cmd.cyan()
-          ),
-          Err(_) => println!(
-            "{} {} {}",
-            "✗".red(),
-            "Failed to shutdown:".red(),
-            &process.cmd.cyan()
-          ),
+          Ok(_) => println!("[{}]: {}", "shutdown:".green(), &process.cmd.cyan()),
+          Err(_) => println!("[{}]: {}", "Failed to shutdown:".red(), &process.cmd.cyan()),
         }
       }
       // Wait for all processes to shutdown completely
@@ -386,14 +377,18 @@ async fn main() {
   // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
-  if args.len() == 2 && args[1] == "init" {
-    match init() {
-      Ok(_) => return,
-      Err(e) => {
-        eprintln!("Error creating a toml configuration file: {:#?}", e);
-        return;
-      }
-    };
+  if args.len() == 2 {
+    if args[1] == "init" {
+      match init() {
+        Ok(_) => return,
+        Err(e) => {
+          eprintln!("Error creating a toml configuration file: {:#?}", e);
+          return;
+        }
+      };
+    } else if args[1] == "--version" || args[1] == "-v" {
+      println!("tide v0.1.0")
+    }
   } else if args.len() == 3 {
     if args[1] == "run" {
       start(&args[2], false).await;

@@ -5,3 +5,5 @@ tide.toml
 log.txt
 /.mypy_cache
 .DS_Store
+tide
+tide.exe
