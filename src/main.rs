@@ -13,7 +13,6 @@ use tokio::signal;
 use tokio::sync::mpsc;
 use toml;
 
-// TODO: Fix ngrok running error
 // TODO: Upload a release to github
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,6 +79,8 @@ impl ProcessManager {
   async fn spawn_cmds(&mut self, cmds: &Vec<String>) {
     // Clear any existing process
     self.kill_all().await;
+    // Wait for all processes to shutdown completely
+    tokio::time::sleep(Duration::from_millis(1000)).await;
     // println!(" spawn: processes len: {}", self.processes.len());
     println!("{}", "Starting commands".blue().bold());
     for cmd in cmds {
@@ -162,7 +163,7 @@ fn print_title() {
   .blue()
   .bold();
 
-  println!("{}", styled_title)
+  println!("{}\n", styled_title)
 }
 
 #[derive(Debug)]
@@ -357,7 +358,7 @@ async fn start(cmd: &String, watch: bool) {
 
         // Handle shutdown signal
         Some(_) = shutdown_rx.recv() => {
-          println!("{}", "\nReceived shutdown signal!!! Shutting down gracefully...".green());
+          println!("\n{}", "Received shutdown signal!!! Shutting down gracefully...".green());
           processes.kill_all().await;
           println!("{}", "Shutdown complete!!!".green());
           std::process::exit(0);
@@ -371,10 +372,11 @@ async fn start(cmd: &String, watch: bool) {
     // Shutdown handler
     if shutdown_rx.recv().await.is_some() {
       println!(
-        "{}",
-        "Received shutdown signal! Shutting down gracefully...".green()
+        "\n{}",
+        "Received shutdown signal!!! Shutting down gracefully...".green()
       );
       processes.kill_all().await;
+      println!("{}", "Shutdown complete!!!".green());
       std::process::exit(0);
     }
   }
