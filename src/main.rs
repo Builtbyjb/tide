@@ -386,5 +386,4 @@ async fn main() {
     (4, "run") if args[3] == "--watch" || args[3] == "-w" => start(&args[2], true).await,
     _ => print_usage(),
   }
-  return;
 }
