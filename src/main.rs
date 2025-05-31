@@ -12,8 +12,7 @@ use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 
-// TODO: Upload a release to github
-// TODO: Add version check
+// Fix pycache directory bug
 
 const VERSION: &str = "tide v0.1.0";
 
@@ -132,10 +131,10 @@ fn print_usage() {
       To exit -> {} 
     "#,
     "Usage:".cyan().bold(),
-    "tide".green(),
-    "tide".green(),
-    "tide".green(),
-    "CTRL + C".yellow()
+    "tide".cyan(),
+    "tide".cyan(),
+    "tide".cyan(),
+    "CTRL + C".cyan()
   );
   println!("{}", usage);
 }
@@ -275,7 +274,7 @@ fn watcher(
   init_run
 }
 
-async fn start(cmd: &String, watch: bool) {
+async fn start(cmd: &str, watch: bool) {
   // Open config file
   let toml_str = match fs::read_to_string("tide.toml") {
     Ok(value) => value,
@@ -294,18 +293,15 @@ async fn start(cmd: &String, watch: bool) {
     }
   };
 
-  // Check if cmd is a valid command
-  let cmds: Vec<String>;
-  if cmd == "dev" {
-    cmds = toml_config.command.dev;
-  } else if cmd == "prod" {
-    cmds = toml_config.command.prod;
-  } else if cmd == "test" {
-    cmds = toml_config.command.test
-  } else {
-    eprintln!("Run value not in commands");
-    std::process::exit(1)
-  }
+  let cmds: Vec<String> = match cmd {
+    "dev" => toml_config.command.dev,
+    "prod" => toml_config.command.prod,
+    "test" => toml_config.command.test,
+    _ => {
+      eprintln!("Run value not in commands");
+      std::process::exit(1)
+    }
+  };
 
   print_title();
 
