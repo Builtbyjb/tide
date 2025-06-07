@@ -11,10 +11,8 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
-use toml;
 
-// TODO: Upload a release to github
-// TODO: Add version check
+const VERSION: &str = "tide v0.1.0";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -55,12 +53,12 @@ impl ProcessManager {
 
   async fn kill_all(&mut self) {
     // println!("processes len: {}", self.processes.len());
-    if self.processes.len() > 0 {
+    if !self.processes.is_empty() {
       println!("{}", "Shutting down commands".blue().bold());
       let mut processes = std::mem::take(&mut self.processes);
       for mut process in processes.drain(..) {
         match process.child.kill().await {
-          Ok(_) => println!("[{}]: {}", "shutdown".green(), &process.cmd.cyan()),
+          Ok(_) => println!("[{}]: {}", "shutting down".green(), &process.cmd.cyan()),
           Err(_) => println!("[{}]: {}", "Failed to shutdown".red(), &process.cmd.cyan()),
         }
       }
@@ -93,7 +91,7 @@ impl ProcessManager {
       .stdout(std::process::Stdio::piped())
       .stderr(std::process::Stdio::piped())
       .spawn()
-      .expect(&format!("Failed to start command: {}", &cmd));
+      .unwrap_or_else(|_| panic!("Failed to start command: {}", &cmd));
 
     // Capture stdout
     if let Some(stdout) = child.stdout.take() {
@@ -131,10 +129,10 @@ fn print_usage() {
       To exit -> {} 
     "#,
     "Usage:".cyan().bold(),
-    "./tide".green(),
-    "./tide".green(),
-    "./tide".green(),
-    "CTRL + C".yellow()
+    "tide".cyan(),
+    "tide".cyan(),
+    "tide".cyan(),
+    "CTRL + C".cyan()
   );
   println!("{}", usage);
 }
@@ -150,7 +148,7 @@ fn print_title() {
   
  Press Crtl + C to exit"#,
     "".blue().bold(),
-    "0.1.0".blue().bold()
+    VERSION.blue().bold(),
   )
   .blue()
   .bold();
@@ -178,7 +176,7 @@ fn init() -> Result<(), ConfigError> {
   match fs::read_to_string("tide.toml") {
     Ok(_) => {
       println!("tide.toml file exists");
-      return Ok(());
+      Ok(())
     }
     Err(_) => {
       // Create tide config file
@@ -202,9 +200,9 @@ fn init() -> Result<(), ConfigError> {
       };
 
       match fs::write("tide.toml", toml_str) {
-        Ok(_) => return Ok(()),
-        Err(e) => return Err(ConfigError::IOError(e)),
-      };
+        Ok(_) => Ok(()),
+        Err(e) => Err(ConfigError::IOError(e)),
+      }
     }
   }
 }
@@ -223,7 +221,7 @@ fn watcher(
       for e in entries {
         let path = e.expect("Invalid entry").path();
 
-        if path.is_dir() && ignore_dirs.contains(&path.display().to_string()) == false {
+        if path.is_dir() && !ignore_dirs.contains(&path.display().to_string()) {
           if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) {
             init_run = true
           }
@@ -236,30 +234,29 @@ fn watcher(
             None => "".to_string(),
           };
 
-          if ignore_exts.contains(&path_ext) == false {
-            if ignore_files.contains(&path.display().to_string()) == false {
-              let metadata = fs::metadata(&path);
+          if !ignore_exts.contains(&path_ext) && !ignore_files.contains(&path.display().to_string())
+          {
+            let metadata = fs::metadata(&path);
 
-              if let Ok(time) = metadata.expect("Error getting file metadata").modified() {
-                // The last time the file was modified
-                let time_secs = time
-                  .duration_since(UNIX_EPOCH)
-                  .expect("Error getting system time")
-                  .as_secs();
+            if let Ok(time) = metadata.expect("Error getting file metadata").modified() {
+              // The last time the file was modified
+              let time_secs = time
+                .duration_since(UNIX_EPOCH)
+                .expect("Error getting system time")
+                .as_secs();
 
-                match files.get(&path) {
-                  Some(value) => {
-                    if *value != time_secs {
-                      files.insert(path.clone(), time_secs);
-                      println!("{:#?} as been modified", &path);
-                      init_run = true;
-                    }
-                  }
-                  None => {
+              match files.get(&path) {
+                Some(value) => {
+                  if *value != time_secs {
                     files.insert(path.clone(), time_secs);
-                    // println!("{:#?} as been modified at {:#?}", path, time);
-                    init_run = true
+                    println!("{:#?} as been modified", &path);
+                    init_run = true;
                   }
+                }
+                None => {
+                  files.insert(path.clone(), time_secs);
+                  // println!("{:#?} as been modified at {:#?}", path, time);
+                  init_run = true
                 }
               }
             }
@@ -275,7 +272,7 @@ fn watcher(
   init_run
 }
 
-async fn start(cmd: &String, watch: bool) {
+async fn start(cmd: &str, watch: bool) {
   // Open config file
   let toml_str = match fs::read_to_string("tide.toml") {
     Ok(value) => value,
@@ -294,18 +291,15 @@ async fn start(cmd: &String, watch: bool) {
     }
   };
 
-  // Check if cmd is a valid command
-  let cmds: Vec<String>;
-  if cmd == "dev" {
-    cmds = toml_config.command.dev;
-  } else if cmd == "prod" {
-    cmds = toml_config.command.prod;
-  } else if cmd == "test" {
-    cmds = toml_config.command.test
-  } else {
-    eprintln!("Run value not in commands");
-    std::process::exit(1)
-  }
+  let cmds: Vec<String> = match cmd {
+    "dev" => toml_config.command.dev,
+    "prod" => toml_config.command.prod,
+    "test" => toml_config.command.test,
+    _ => {
+      eprintln!("Run value not in commands");
+      std::process::exit(1)
+    }
+  };
 
   print_title();
 
@@ -374,37 +368,16 @@ async fn start(cmd: &String, watch: bool) {
 
 #[tokio::main]
 async fn main() {
-  // Get command line arguments
   let args: Vec<String> = env::args().collect();
 
-  if args.len() == 2 {
-    if args[1] == "init" {
-      match init() {
-        Ok(_) => return,
-        Err(e) => {
-          eprintln!("Error creating a toml configuration file: {:#?}", e);
-          return;
-        }
-      };
-    } else if args[1] == "--version" || args[1] == "-v" {
-      println!("tide v0.1.0")
-    }
-  } else if args.len() == 3 {
-    if args[1] == "run" {
-      start(&args[2], false).await;
-    } else {
-      print_usage();
-      return ();
-    }
-  } else if args.len() == 4 {
-    if args[1] == "run" && (args[3] == "--watch" || args[3] == "-w") {
-      start(&args[2], true).await;
-    } else {
-      print_usage();
-      return ();
-    }
-  } else {
-    print_usage();
-    return ();
+  match (args.len(), args[1].as_str()) {
+    (2, "init") => match init() {
+      Ok(_) => return,
+      Err(e) => eprintln!("Error creating a toml configuration file: {:#?}", e),
+    },
+    (2, "--version") | (2, "-v") => println!("{}", VERSION),
+    (3, "run") => start(&args[2], false).await,
+    (4, "run") if args[3] == "--watch" || args[3] == "-w" => start(&args[2], true).await,
+    _ => print_usage(),
   }
 }
