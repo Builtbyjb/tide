@@ -5,18 +5,23 @@ Tide is a cli program that runs multiple commands concurrently. Tide also offers
 ### Commands
 
 Create a tide configuration file.
-```sh
+```bash
 tide init 
 ```
 
 Runs the list of commands assigned to the **dev** variable under the command table. The command table contains three variables **dev**, **prod**, and **test**
-```sh
+```bash
 tide run dev 
 ```
 
 Re runs the commands in the **dev** variable every time a file is modified (live reloading)
-```sh
+```bash
 tide run dev --watch 
+```
+
+Check current version
+```bash
+tide --version
 ```
 
 ### Tide Configuration
@@ -48,7 +53,7 @@ test = []
 
 [exclude]
 dir = ["./.git", "./node_modules", "./.mypy_cache", "./.vscode"]
-file = [ "README.md"]
+file = ["README.md"]
 ext = []
 ```
 
@@ -60,6 +65,6 @@ curl -LsSf https://raw.githubusercontent.com/builtbyjb/tide/main/install.sh | sh
 
 ### Uninstall
 mac os and linux
-```sh
+```bash
 rm -rf ~/.local/bin/tide
 ```

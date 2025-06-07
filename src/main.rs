@@ -12,8 +12,6 @@ use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 
-// Fix pycache directory bug
-
 const VERSION: &str = "tide v0.1.0";
 
 #[derive(Serialize, Deserialize, Debug)]
