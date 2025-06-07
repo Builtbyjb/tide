@@ -47,7 +47,7 @@ install_binary() {
 
   chmod +x "$APP_NAME"
 
-  if [ "$platform" == "macos-arm64" ]; then
+  if [ "$platform" = "macos-arm64" ]; then
     # Remove com.app.quarantine attribute if it exists
     if xattr -p com.app.quarantine "$APP_NAME" >/dev/null 2>&1; then
       xattr -d "com.apple.quarantine" "$APP_NAME"
