@@ -224,7 +224,18 @@ fn watcher(
       for e in entries {
         let path = e.expect("Invalid entry").path();
 
-        if path.is_dir() && !ignore_dirs.contains(&path.display().to_string()) {
+        if path.is_dir()
+          && !ignore_dirs.contains(
+            &path
+              .display()
+              .to_string()
+              .split("/")
+              .last()
+              .unwrap()
+              .to_string(),
+          )
+        {
+          // println!("{:#?}", path.display().to_string().split("/").last().unwrap());
           if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files)? {
             init_run = true
           }
@@ -237,7 +248,16 @@ fn watcher(
             None => "".to_string(),
           };
 
-          if !ignore_exts.contains(&path_ext) && !ignore_files.contains(&path.display().to_string())
+          if !ignore_exts.contains(&path_ext)
+            && !ignore_files.contains(
+              &path
+                .display()
+                .to_string()
+                .split("/")
+                .last()
+                .unwrap()
+                .to_string(),
+            )
           {
             let metadata = fs::metadata(&path);
 
