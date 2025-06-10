@@ -1,9 +1,12 @@
+#[cfg(test)]
 mod test;
+
 use colored::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 use std::time::{Duration, UNIX_EPOCH};
@@ -148,7 +151,7 @@ fn print_title() {
   
  Press Crtl + C to exit"#,
     "".blue().bold(),
-    VERSION.blue().bold(),
+    &VERSION.blue().bold(),
   )
   .blue()
   .bold();
@@ -188,9 +191,9 @@ fn init() -> Result<(), ConfigError> {
           test: vec![],
         },
         exclude: Exclude {
-          dir: vec![String::from("./.git")],
+          dir: vec![".git".to_string()],
           file: vec![],
-          ext: vec![],
+          ext: vec!["toml".to_string()],
         },
       };
 
@@ -214,15 +217,26 @@ fn watcher(
   ignore_files: &Vec<String>,
   ignore_exts: &Vec<String>,
   files: &mut HashMap<PathBuf, u64>,
-) -> bool {
+) -> io::Result<bool> {
   let mut init_run = false;
   match fs::read_dir(root_path) {
     Ok(entries) => {
       for e in entries {
         let path = e.expect("Invalid entry").path();
 
-        if path.is_dir() && !ignore_dirs.contains(&path.display().to_string()) {
-          if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files) {
+        if path.is_dir()
+          && !ignore_dirs.contains(
+            &path
+              .display()
+              .to_string()
+              .split("/")
+              .last()
+              .unwrap()
+              .to_string(),
+          )
+        {
+          // println!("{:#?}", path.display().to_string().split("/").last().unwrap());
+          if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files)? {
             init_run = true
           }
         } else if path.is_file() {
@@ -234,7 +248,16 @@ fn watcher(
             None => "".to_string(),
           };
 
-          if !ignore_exts.contains(&path_ext) && !ignore_files.contains(&path.display().to_string())
+          if !ignore_exts.contains(&path_ext)
+            && !ignore_files.contains(
+              &path
+                .display()
+                .to_string()
+                .split("/")
+                .last()
+                .unwrap()
+                .to_string(),
+            )
           {
             let metadata = fs::metadata(&path);
 
@@ -264,12 +287,12 @@ fn watcher(
         }
       }
     }
-    Err(_) => {
+    Err(err) => {
       eprintln!("Error reading directory entries");
-      std::process::exit(1)
+      return Err(err);
     }
   }
-  init_run
+  Ok(init_run)
 }
 
 async fn start(cmd: &str, watch: bool) {
@@ -334,7 +357,7 @@ async fn start(cmd: &str, watch: bool) {
             &mut files,
           );
 
-          if should_run {
+          if should_run.unwrap() {
             processes.spawn_cmds(&cmds).await;
           }
 
@@ -356,10 +379,7 @@ async fn start(cmd: &str, watch: bool) {
 
     // Shutdown handler
     if shutdown_rx.recv().await.is_some() {
-      println!(
-        "\n{}",
-        "Received shutdown signal!!! Shutting down gracefully...".green()
-      );
+      println!("\n{}", "Received shutdown signal!!! Shutting down gracefully...".green());
       processes.kill_all().await;
       std::process::exit(0);
     }
@@ -375,7 +395,7 @@ async fn main() {
       Ok(_) => return,
       Err(e) => eprintln!("Error creating a toml configuration file: {:#?}", e),
     },
-    (2, "--version") | (2, "-v") => println!("{}", VERSION),
+    (2, "--version") | (2, "-v") => println!("{}", &VERSION),
     (3, "run") => start(&args[2], false).await,
     (4, "run") if args[3] == "--watch" || args[3] == "-w" => start(&args[2], true).await,
     _ => print_usage(),

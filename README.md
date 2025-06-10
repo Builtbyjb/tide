@@ -52,14 +52,14 @@ prod = []
 test = []
 
 [exclude]
-dir = ["./.git", "./node_modules", "./.mypy_cache", "./.vscode"]
+dir = [".git", "node_modules", ".mypy_cache", "__pycache__"]
 file = ["README.md"]
-ext = []
+ext = ["toml"]
 ```
 
 ### Installation
 mac os (arm64) and linux (x86_64)
-```sh 
+```bash 
 curl -LsSf https://raw.githubusercontent.com/builtbyjb/tide/main/install.sh | sh
 ```
 
