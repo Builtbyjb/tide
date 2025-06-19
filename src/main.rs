@@ -223,19 +223,9 @@ fn watcher(
     Ok(entries) => {
       for e in entries {
         let path = e.expect("Invalid entry").path();
+        let path_name = path.display().to_string().split("/").last().unwrap().to_string();
 
-        if path.is_dir()
-          && !ignore_dirs.contains(
-            &path
-              .display()
-              .to_string()
-              .split("/")
-              .last()
-              .unwrap()
-              .to_string(),
-          )
-        {
-          // println!("{:#?}", path.display().to_string().split("/").last().unwrap());
+        if path.is_dir() && !ignore_dirs.contains(&path_name) {
           if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files)? {
             init_run = true
           }
@@ -248,25 +238,13 @@ fn watcher(
             None => "".to_string(),
           };
 
-          if !ignore_exts.contains(&path_ext)
-            && !ignore_files.contains(
-              &path
-                .display()
-                .to_string()
-                .split("/")
-                .last()
-                .unwrap()
-                .to_string(),
-            )
-          {
+          if !ignore_exts.contains(&path_ext) && !ignore_files.contains(&path_name) {
             let metadata = fs::metadata(&path);
 
             if let Ok(time) = metadata.expect("Error getting file metadata").modified() {
               // The last time the file was modified
-              let time_secs = time
-                .duration_since(UNIX_EPOCH)
-                .expect("Error getting system time")
-                .as_secs();
+              let time_secs =
+                time.duration_since(UNIX_EPOCH).expect("Error getting system time").as_secs();
 
               match files.get(&path) {
                 Some(value) => {
@@ -334,10 +312,7 @@ async fn start(cmd: &str, watch: bool) {
   // Ctrl+C handle
   tokio::spawn(async move {
     signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    shutdown_tx
-      .send(())
-      .await
-      .expect("Failed to send shutdown signal");
+    shutdown_tx.send(()).await.expect("Failed to send shutdown signal");
   });
 
   if watch {
