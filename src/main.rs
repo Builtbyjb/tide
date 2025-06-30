@@ -217,7 +217,10 @@ fn init() -> Result<(), ConfigError> {
       };
 
       match fs::write("tide.toml", toml_str) {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+          println!("tide.toml file created");
+          Ok(())
+        }
         Err(e) => Err(ConfigError::IOError(e)),
       }
     }
