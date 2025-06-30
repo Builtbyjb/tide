@@ -240,7 +240,10 @@ fn watcher(
     Ok(entries) => {
       for e in entries {
         let path = e.expect("Invalid entry").path();
+        #[cfg(unix)]
         let path_name = path.display().to_string().split("/").last().unwrap().to_string();
+        #[cfg(windows)]
+        let path_name = path.display().to_string().split("\\").last().unwrap().to_string();
 
         if path.is_dir() && !ignore_dirs.contains(&path_name) {
           if watcher(&path, ignore_dirs, ignore_files, ignore_exts, files)? {
