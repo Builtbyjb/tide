@@ -102,13 +102,11 @@ try {
       if ($versionInfo) {
         Write-Host "Version: $versionInfo" -ForegroundColor Green
       }
-    } catch {
-        # Version command might not be available, that's okay
-    }
+    } catch { }
   }
     
   Write-Host "Installation successful!" -ForegroundColor Green
-  Write-Host "Check current version with: '$EXECUTABLE_NAME --version'" -ForegroundColor Cyan
+  Write-Host "Restart your terminal and check current version with: '$EXECUTABLE_NAME --version'" -ForegroundColor Cyan
 } catch {
   Write-Error "Installation failed: $($_.Exception.Message)"
   Write-Host "Please check:" -ForegroundColor Yellow
