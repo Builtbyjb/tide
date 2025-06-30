@@ -108,7 +108,7 @@ try {
   }
     
   Write-Host "Installation successful!" -ForegroundColor Green
-  Write-Host "Run '$EXECUTABLE_NAME --help' to get started (after restarting terminal if added to PATH)" -ForegroundColor Cyan
+  Write-Host "Check current version with: '$EXECUTABLE_NAME --version'" -ForegroundColor Cyan
 } catch {
   Write-Error "Installation failed: $($_.Exception.Message)"
   Write-Host "Please check:" -ForegroundColor Yellow
