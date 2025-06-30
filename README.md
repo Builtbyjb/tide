@@ -59,7 +59,7 @@ test = []
 [os.windows]
 dev = [
   "python main.py", 
-  "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --minify", 
+  "npx @tailwindcss\\cli -i .\\src\\input.css -o .\\src\\output.css --minify", 
 ]
 prod = []
 test = []
