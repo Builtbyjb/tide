@@ -7,7 +7,7 @@ param(
 # Configuration
 $GITHUB_USER = "builtbyjb"
 $GITHUB_REPO = "tide"
-$BINARY_NAME = "tide-windows.exe"
+$BINARY_NAME = "tide.exe"
 $EXECUTABLE_NAME = "tide"
 
 Write-Host "Installing $EXECUTABLE_NAME..." -ForegroundColor Green

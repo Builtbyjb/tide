@@ -5,7 +5,7 @@ param(
 )
 
 # Configuration 
-$EXECUTABLE_NAME = "tide-windows" 
+$EXECUTABLE_NAME = "tide" 
 $APP_NAME = "tide"
 
 Write-Host "Uninstalling $APP_NAME..." -ForegroundColor Red
