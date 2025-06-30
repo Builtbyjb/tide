@@ -15,13 +15,19 @@ use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 
-const VERSION: &str = "tide v0.1.0";
+const VERSION: &str = "tide v0.1.1";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
   root_dir: String,
-  command: Cmd,
+  os: Os,
   exclude: Exclude,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Os {
+  unix: Cmd,
+  windows: Cmd,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -83,6 +89,7 @@ impl ProcessManager {
   }
 
   async fn spawn_cmd(&mut self, cmd: String) -> Process {
+    // Check device
     #[cfg(unix)]
     let (shell, shell_arg) = ("sh", "-c");
     #[cfg(windows)]
@@ -185,10 +192,17 @@ fn init() -> Result<(), ConfigError> {
       // Create tide config file
       let config = Config {
         root_dir: ".".to_string(),
-        command: Cmd {
-          dev: vec![],
-          prod: vec![],
-          test: vec![],
+        os: Os {
+          unix: Cmd {
+            dev: vec![],
+            prod: vec![],
+            test: vec![],
+          },
+          windows: Cmd {
+            dev: vec![],
+            prod: vec![],
+            test: vec![],
+          },
         },
         exclude: Exclude {
           dir: vec![".git".to_string()],
@@ -292,10 +306,16 @@ async fn start(cmd: &str, watch: bool) {
     }
   };
 
+  // Check device
+  #[cfg(unix)]
+  let cmd_config: Cmd = toml_config.os.unix;
+  #[cfg(windows)]
+  let cmd_config: Cmd = toml_config.os.windows;
+
   let cmds: Vec<String> = match cmd {
-    "dev" => toml_config.command.dev,
-    "prod" => toml_config.command.prod,
-    "test" => toml_config.command.test,
+    "dev" => cmd_config.dev,
+    "prod" => cmd_config.prod,
+    "test" => cmd_config.test,
     _ => {
       eprintln!("Run value not in commands");
       std::process::exit(1)
