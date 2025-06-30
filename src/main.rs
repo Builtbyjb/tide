@@ -323,10 +323,15 @@ async fn start(cmd: &str, watch: bool) {
     "prod" => cmd_config.prod,
     "test" => cmd_config.test,
     _ => {
-      eprintln!("Run value not in commands");
+      eprintln!("Run value not in os table");
       std::process::exit(1)
     }
   };
+
+  if cmds.is_empty() {
+    println!("No command found in the '{cmd}' variable");
+    std::process::exit(1)
+  }
 
   print_title();
 
