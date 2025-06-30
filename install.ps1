@@ -18,7 +18,7 @@ try {
     $releaseUrl = "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases/latest"
     Write-Host "Fetching latest release information..." -ForegroundColor Yellow
   } else {
-    $releaseUrl = "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases/tags/$Version"
+    $releaseUrl = "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases/tags/v$Version"
     Write-Host "Fetching release information for version $Version..." -ForegroundColor Yellow
   }
 
