@@ -29,7 +29,12 @@ You can configure how tide works by editing the tide.toml configuration file.
 
 The variable **root_dir** sets the starting point of the directories **tide** will watch.
 
-The table **[command]** contains three variables:
+The table **[os.unix]** contains three variables, each variable contains commands to run on a unix machine:
++ **dev**: A list of all the commands to run in a development environment.
++ **prod**: A list of all the commands to run in a production environment.
++ **test**: A list of all the commands to run tests.
+
+The table **[os.windows]** contains three variables, each variable contains commands to run on a windows machine:
 + **dev**: A list of all the commands to run in a development environment.
 + **prod**: A list of all the commands to run in a production environment.
 + **test**: A list of all the commands to run tests.
@@ -43,9 +48,17 @@ The table **[exclude]** contains three variables:
 ```toml
 root_dir = "."
 
-[command]
+[os.unix]
 dev = [
   "python3 main.py", 
+  "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --minify", 
+]
+prod = []
+test = []
+
+[os.windows]
+dev = [
+  "python main.py", 
   "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --minify", 
 ]
 prod = []
@@ -63,8 +76,18 @@ mac os (arm64) and linux (x86_64)
 curl -LsSf https://raw.githubusercontent.com/builtbyjb/tide/main/install.sh | sh
 ```
 
+windows
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/builtbyjb/tide/main/install.ps1 | iex"
+```
+
 ### Uninstall
 mac os and linux
 ```bash
 rm -rf ~/.local/bin/tide
+```
+
+windows
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/builtbyjb/tide/main/uninstall.ps1 | iex"
 ```
