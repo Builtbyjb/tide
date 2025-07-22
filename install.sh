@@ -40,7 +40,7 @@ get_expected_checksum() {
 
   curl -LsSf "$release_url"  -o release.json
 
-  local digest=$(jq -r --arg name "$asset_name" '.assets[] | select(.name == $name) | .digest' "release.json")
+  local digest=$(jq -r --arg name "tide-$platform" '.assets[] | select(.name == $name) | .digest' "release.json")
   rm -rf release.json
   echo "$digest" | sed 's/^sha256://'
 }
