@@ -2,9 +2,7 @@
 .vscode
 tide.toml
 tide.toml.bak
-/test_dir
 log.txt
-/.mypy_cache
 .DS_Store
 tide
 tide.exe

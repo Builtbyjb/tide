@@ -15,7 +15,7 @@ use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::mpsc;
 
-const VERSION: &str = "tide v0.1.1";
+const VERSION: &str = "v0.1.2";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
@@ -401,7 +401,7 @@ async fn main() {
       Ok(_) => return,
       Err(e) => eprintln!("Error creating a toml configuration file: {:#?}", e),
     },
-    (2, "--version") | (2, "-v") => println!("{}", &VERSION),
+    (2, "--version") | (2, "-v") => println!("tide {}", &VERSION),
     (3, "run") => start(&args[2], false).await,
     (4, "run") if args[3] == "--watch" || args[3] == "-w" => start(&args[2], true).await,
     _ => print_usage(),

@@ -34,10 +34,22 @@ detect_platform() {
   echo "${os}-${arch}"
 }
 
+get_expected_checksum() {
+  local platform="$1"
+  local release_url="https://api.github.com/repos/builtbyjb/tide/releases/tags/v$APP_VERSION"
+
+  curl -LsSf "$release_url"  -o release.json
+
+  local digest=$(jq -r --arg name "$asset_name" '.assets[] | select(.name == $name) | .digest' "release.json")
+  rm -rf release.json
+  echo "$digest" | sed 's/^sha256://'
+}
+
 install_binary() {
   local platform="$1"
   local download_url="https://github.com/builtbyjb/tide/releases/download/v$APP_VERSION/$APP_NAME-$platform"
 
+  # Create installation directory if it doesn't exist
   if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR"
   fi
@@ -54,15 +66,25 @@ install_binary() {
     fi
   fi
 
-  mv "$APP_NAME" "$INSTALL_DIR"
+  # Verify checksum
+  ACTUAL_CHECKSUM=$(sha256sum "$APP_NAME" | awk '{print $1}')
+  EXPECTED_CHECKSUM=$(get_expected_checksum "$platform")
+
+  if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+    echo "Checksum verification failed"
+    rm -f "$APP_NAME"
+    exit 1
+  else
+    mv "$APP_NAME" "$INSTALL_DIR"
+  fi
 }
 
 verify_installation() {
   if [ -x "$INSTALL_DIR/$APP_NAME" ]; then
-    echo "Installation successful!"
+    echo "Download successful!"
     echo "Check current version with: $APP_NAME --version"
   else
-    echo "Installation failed: binary not found at $INSTALL_DIR/$APP_NAME"
+    echo "Download failed: binary not found at $INSTALL_DIR/$APP_NAME"
     exit 1
   fi
 }
