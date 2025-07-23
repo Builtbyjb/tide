@@ -30,12 +30,10 @@ try {
     
   if (-not $asset) {
     Write-Error "Binary '$BINARY_NAME' not found in release assets!"
-    Write-Host "Available assets:" -ForegroundColor Yellow
-    $release.assets | ForEach-Object { Write-Host "  - $($_.name)" }
     exit 1
   }
     
-  Write-Host "Found asset: $($asset.name) ($(($asset.size / 1MB).ToString('F1')) MB)" -ForegroundColor Green
+  # Write-Host "Found asset: $($asset.name) ($(($asset.size / 1MB).ToString('F1')) MB)" -ForegroundColor Green
     
   # Create install directory
   if (-not (Test-Path $InstallPath)) {
@@ -60,7 +58,7 @@ try {
   # verify checksum
   $digest = $asset.digest
   $expectedHash = $digest -replace "sha256:", ""
-  $actualHash = (Get-FileHash -Path $InstallPath).Hash.ToLower()
+  $actualHash = (Get-FileHash -Path $tempFile).Hash.ToLower()
 
   if ($actualHash -eq $expectedHash) {
     Write-Host "Hash verification PASSED" -ForegroundColor Green
@@ -68,7 +66,7 @@ try {
     Write-Host "Hash verification FAILED" -ForegroundColor Red
     Write-Host "Expected: $expectedHash"
     Write-Host "Actual:   $actualHash"
-    Remove-Item -Path $BINARY_NAME -Force
+    Remove-Item -Path $tempFile -Force
     exit 1
   }
     
