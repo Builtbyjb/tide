@@ -46,7 +46,7 @@ try {
   # Download the binary
   $downloadUrl = $asset.browser_download_url
   $tempFile = "$env:TEMP\$BINARY_NAME"
-  $finalPath = "$InstallPath\$EXECUTABLE_NAME.exe"
+  $finalPath = "$InstallPath\$BINARY_NAME"
     
   Write-Host "Downloading from: $downloadUrl" -ForegroundColor Yellow
   Write-Host "Downloading to: $tempFile" -ForegroundColor Yellow
@@ -58,7 +58,19 @@ try {
   Write-Host "Download completed!" -ForegroundColor Green
 
   # verify checksum
+  $digest = $asset.digest
+  $expectedHash = $digest -replace "sha256:", ""
+  $actualHash = (Get-FileHash -Path $InstallPath).Hash.ToLower()
 
+  if ($actualHash -eq $expectedHash) {
+    Write-Host "Hash verification PASSED" -ForegroundColor Green
+  } else {
+    Write-Host "Hash verification FAILED" -ForegroundColor Red
+    Write-Host "Expected: $expectedHash"
+    Write-Host "Actual:   $actualHash"
+    Remove-Item -Path $BINARY_NAME -Force
+    exit 1
+  }
     
   # Move to final location
   Write-Host "Installing to: $finalPath" -ForegroundColor Yellow
@@ -72,8 +84,8 @@ try {
   $acl.SetAccessRule($accessRule)
   Set-Acl $finalPath $acl
     
-  Write-Host "Installation completed successfully!" -ForegroundColor Green
-  Write-Host "Binary installed at: $finalPath" -ForegroundColor Cyan
+  Write-Host "Download completed successfully!" -ForegroundColor Green
+  Write-Host "Binary downloaded at: $finalPath" -ForegroundColor Cyan
     
   # Add to PATH if requested
   if ($AddToPath) {
@@ -91,8 +103,8 @@ try {
     }
   }
     
-  # Test installation
-  Write-Host "`nTesting installation..." -ForegroundColor Yellow
+  # Test download
+  Write-Host "`nTesting download..." -ForegroundColor Yellow
   if (Test-Path $finalPath) {
     $fileInfo = Get-Item $finalPath
     Write-Host "File exists: $($fileInfo.FullName)" -ForegroundColor Green
@@ -108,10 +120,10 @@ try {
     } catch { }
   }
     
-  Write-Host "Installation successful!" -ForegroundColor Green
+  Write-Host "Download verified!" -ForegroundColor Green
   Write-Host "Restart your terminal and check current version with: '$EXECUTABLE_NAME --version'" -ForegroundColor Cyan
 } catch {
-  Write-Error "Installation failed: $($_.Exception.Message)"
+  Write-Error "Download failed: $($_.Exception.Message)"
   Write-Host "Please check:" -ForegroundColor Yellow
   Write-Host "  1. Repository exists: https://github.com/$GITHUB_USER/$GITHUB_REPO" -ForegroundColor Yellow
   Write-Host "  2. Release exists with binary named '$BINARY_NAME'" -ForegroundColor Yellow

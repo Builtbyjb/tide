@@ -11,10 +11,7 @@ use super::*;
 
 // Helper to create a file with content and set modification time
 fn create_file(path: &Path, content: &str, modify_time_offset: u64) {
-  File::create(path)
-    .unwrap()
-    .write_all(content.as_bytes())
-    .unwrap();
+  File::create(path).unwrap().write_all(content.as_bytes()).unwrap();
   let new_time = UNIX_EPOCH + Duration::from_secs(modify_time_offset);
   filetime::set_file_mtime(path, filetime::FileTime::from_system_time(new_time)).unwrap();
 }

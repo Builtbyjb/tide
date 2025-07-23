@@ -19,6 +19,9 @@ jobs:
 
       - name: Install dependencies
         run: cargo install --path .
+        
+      - name: Format 
+        run: cargo fmt --check
 
       - name: Run tests
         run: cargo test
