@@ -1,0 +1,11 @@
+name: tests
+
+on:
+  [push, pull_request]
+
+jobs:
+  test:
+  # test for linux
+  # test for macos
+  # test for windows
+  # test for different os architectures
