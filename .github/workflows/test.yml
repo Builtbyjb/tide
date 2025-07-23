@@ -5,7 +5,18 @@ on:
 
 jobs:
   test:
-  # test for linux
-  # test for macos
-  # test for windows
-  # test for different os architectures
+    runs-on: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Install dependencies
+        run: cargo install --path .
+
+      - name: Run tests
+        run: cargo test
