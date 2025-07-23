@@ -56,6 +56,9 @@ try {
   $webClient.DownloadFile($downloadUrl, $tempFile)
     
   Write-Host "Download completed!" -ForegroundColor Green
+
+  # verify checksum
+
     
   # Move to final location
   Write-Host "Installing to: $finalPath" -ForegroundColor Yellow
