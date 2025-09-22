@@ -1,6 +1,7 @@
 name: tests
 
-on: [push, pull_request]
+on:
+  [push, pull_request]
 
 jobs:
   test:
@@ -18,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: cargo install --path .
-
+        
       - name: Format
         run: cargo fmt --check
 

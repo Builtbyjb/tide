@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 APP_NAME="tide"
-APP_VERSION="0.1.1"
+APP_VERSION="0.1.2"
 GITHUB_REPO="builtbyjb/tide"
 INSTALL_DIR="$HOME/.local/bin"
 
@@ -29,7 +29,7 @@ detect_platform() {
     echo "Unsupported architecture: $(uname -m)"
     exit 1
     ;;
-  esac 
+  esac
 
   echo "${os}-${arch}"
 }
@@ -96,7 +96,7 @@ main() {
     local current_version
     current_version=$("$INSTALL_DIR/$APP_NAME" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
 
-    if [ "$current_version" = "$APP_VERSION" ]; then 
+    if [ "$current_version" = "$APP_VERSION" ]; then
       echo "Application is up-to-date (version $APP_VERSION)"
       exit 1
     elif [ "$current_version" = "unknown" ]; then

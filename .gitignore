@@ -6,5 +6,4 @@ log.txt
 .DS_Store
 tide
 tide.exe
-.zig-cache
-test_dir
+/test_dir
