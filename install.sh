@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 APP_NAME="tide"
-APP_VERSION="0.1.1"
+APP_VERSION="0.1.2"
 GITHUB_REPO="builtbyjb/tide"
 INSTALL_DIR="$HOME/.local/bin"
 
@@ -29,15 +29,27 @@ detect_platform() {
     echo "Unsupported architecture: $(uname -m)"
     exit 1
     ;;
-  esac 
+  esac
 
   echo "${os}-${arch}"
+}
+
+get_expected_checksum() {
+  local platform="$1"
+  local release_url="https://api.github.com/repos/builtbyjb/tide/releases/tags/v$APP_VERSION"
+
+  curl -LsSf "$release_url"  -o release.json
+
+  local digest=$(jq -r --arg name "tide-$platform" '.assets[] | select(.name == $name) | .digest' "release.json")
+  rm -rf release.json
+  echo "$digest" | sed 's/^sha256://'
 }
 
 install_binary() {
   local platform="$1"
   local download_url="https://github.com/builtbyjb/tide/releases/download/v$APP_VERSION/$APP_NAME-$platform"
 
+  # Create installation directory if it doesn't exist
   if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR"
   fi
@@ -54,15 +66,25 @@ install_binary() {
     fi
   fi
 
-  mv "$APP_NAME" "$INSTALL_DIR"
+  # Verify checksum
+  ACTUAL_CHECKSUM=$(sha256sum "$APP_NAME" | awk '{print $1}')
+  EXPECTED_CHECKSUM=$(get_expected_checksum "$platform")
+
+  if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+    echo "Checksum verification failed"
+    rm -f "$APP_NAME"
+    exit 1
+  else
+    mv "$APP_NAME" "$INSTALL_DIR"
+  fi
 }
 
 verify_installation() {
   if [ -x "$INSTALL_DIR/$APP_NAME" ]; then
-    echo "Installation successful!"
+    echo "Download successful!"
     echo "Check current version with: $APP_NAME --version"
   else
-    echo "Installation failed: binary not found at $INSTALL_DIR/$APP_NAME"
+    echo "Download failed: binary not found at $INSTALL_DIR/$APP_NAME"
     exit 1
   fi
 }
@@ -74,7 +96,7 @@ main() {
     local current_version
     current_version=$("$INSTALL_DIR/$APP_NAME" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
 
-    if [ "$current_version" = "$APP_VERSION" ]; then 
+    if [ "$current_version" = "$APP_VERSION" ]; then
       echo "Application is up-to-date (version $APP_VERSION)"
       exit 1
     elif [ "$current_version" = "unknown" ]; then
