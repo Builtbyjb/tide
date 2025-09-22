@@ -1,0 +1,26 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: cargo install --path .
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Run tests
+        run: cargo test

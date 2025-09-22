@@ -67,8 +67,13 @@ impl ProcessManager {
             let label = cmd.clone();
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    println!("[{}]: {}", label.cyan(), line);
+                if let Ok(Some(first_line)) = reader.next_line().await {
+                    println!("{}:", label.cyan());
+                    println!("\t{}", first_line);
+
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        println!("\t{}", line);
+                    }
                 }
             });
         }
@@ -78,8 +83,13 @@ impl ProcessManager {
             let label = cmd.clone();
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    eprintln!("[{}]: {}", label.cyan(), line);
+                if let Ok(Some(first_line)) = reader.next_line().await {
+                    println!("{}:", label.cyan());
+                    println!("\t{}", first_line);
+
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        println!("\t{}", line);
+                    }
                 }
             });
         }
