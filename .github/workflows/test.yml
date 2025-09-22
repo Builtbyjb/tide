@@ -1,11 +1,7 @@
 name: tests
 
-<<<<<<< HEAD
-on: [push, pull_request]
-=======
 on:
   [push, pull_request]
->>>>>>> main
 
 jobs:
   test:
@@ -23,13 +19,8 @@ jobs:
 
       - name: Install dependencies
         run: cargo install --path .
-<<<<<<< HEAD
-
-      - name: Format
-=======
         
-      - name: Format 
->>>>>>> main
+      - name: Format
         run: cargo fmt --check
 
       - name: Run tests
