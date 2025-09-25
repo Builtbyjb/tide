@@ -1,7 +1,6 @@
 name: tests
 
-on:
-  [push, pull_request]
+on: [push, pull_request]
 
 jobs:
   test:
@@ -19,9 +18,11 @@ jobs:
 
       - name: Install dependencies
         run: cargo install --path .
-        
+
       - name: Format
-        run: cargo fmt --check
+        run: |
+          rustup component add rustfmt
+          cargo fmt --check
 
       - name: Run tests
         run: cargo test
