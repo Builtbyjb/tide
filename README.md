@@ -1,93 +1,135 @@
 # Tide
 
-Tide is a cli program that runs multiple commands concurrently. Tide also offers live reloading.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/release/builtbyjb/tide.svg)](https://github.com/builtbyjb/tide/releases)
 
-### Commands
+**Tide** is a powerful CLI tool that runs multiple commands concurrently with built-in live reloading capabilities. Perfect for development workflows where you need to run multiple processes simultaneously and automatically restart them when files change.
 
-Create a tide configuration file.
+## Features
+
+- **Concurrent Execution**: Run multiple commands simultaneously
+- **Live Reloading**: Automatically restart commands when files change
+- **Cross-Platform**: Works on macOS, Linux, and Windows
+- **Flexible Configuration**: Customize behavior with TOML configuration
+- **Intelligent File Watching**: Exclude specific directories, files, or extensions
+- **OS-Specific Commands**: Define different commands for different operating systems
+
+## Installation
+
+### macOS (ARM64) & Linux (x86_64)
 ```bash
-tide init 
+curl -LsSf https://raw.githubusercontent.com/builtbyjb/tide/main/install.sh | sh
 ```
 
-Runs the list of commands assigned to the **dev** variable under the command table. The command table contains three variables **dev**, **prod**, and **test**
-```bash
-tide run dev 
+### Windows
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/builtbyjb/tide/main/install.ps1 | iex"
 ```
 
-Re runs the commands in the **dev** variable every time a file is modified (live reloading)
+## Commands
+
+### `tide init`
+Creates a new `tide.toml` configuration file in the current directory with sensible defaults.
+
+### `tide run <variable>`
+Runs the commands defined for the specified variable name in your configuration. The variable name can be anything you choose (e.g., `dev`, `prod`, `test`, `build`, `start`, `server`, etc.).
+
+**Examples:**
 ```bash
-tide run dev --watch 
+# Run commands defined under 'dev' variable
+tide run dev
+
+# Run commands defined under 'prod' variable
+tide run prod
+
+# Run commands defined under 'test' variable
+tide run test
 ```
 
-Check current version
+### `tide run <variable> --watch`
+Runs commands with live reloading enabled. Commands will automatically restart when files are modified.
+
 ```bash
-tide --version
+# Run with file watching
+tide run dev --watch
 ```
 
-### Tide Configuration
-You can configure how tide works by editing the tide.toml configuration file.
+### `tide --version`
+Display the current version of Tide.
 
-The variable **root_dir** sets the starting point of the directories **tide** will watch.
+## Configuration
 
-The table **[os.unix]** contains three variables, each variable contains commands to run on a unix machine:
-+ **dev**: A list of all the commands to run in a development environment.
-+ **prod**: A list of all the commands to run in a production environment.
-+ **test**: A list of all the commands to run tests.
+Tide uses a `tide.toml` file for configuration. This file defines which commands to run for different environments and how file watching should behave.
 
-The table **[os.windows]** contains three variables, each variable contains commands to run on a windows machine:
-+ **dev**: A list of all the commands to run in a development environment.
-+ **prod**: A list of all the commands to run in a production environment.
-+ **test**: A list of all the commands to run tests.
+### Configuration Structure
 
-The table **[exclude]** contains three variables:
-+ **dir**: A list of directories *tide* should not watch.
-+ **file**: A list of files **tide** should not watch.
-+ **ext**: A list of file extensions **tide** should not watch.
+| Setting | Description |
+|---------|-------------|
+| `root_dir` | The root directory for file watching (default: `"."`) |
+| `[os.unix]` | Commands for Unix-based systems (macOS, Linux) |
+| `[os.windows]` | Commands for Windows systems |
+| `[exclude]` | Files, directories, and extensions to exclude from watching |
 
-#### Example configuration
+### Variable Commands
+
+Each OS section can define commands under any variable name you choose. The variable names are completely flexible and can be anything that makes sense for your workflow.
+
+**Variable Format**: Each variable should contain a list of commands. This can be multiple commands or a single command (still in list format).
+
+**Examples:**
+```toml
+# Multiple commands
+dev = [
+  "npm run dev",
+  "python3 -m http.server 8080",
+  "npx tailwindcss --watch"
+]
+
+# Single command (still in list format)
+build = ["npm run build"]
+```
+
+### Exclusion Options
+
+The `[exclude]` table supports:
+- **`dir`**: Directories to exclude from watching
+- **`file`**: Specific files to exclude
+- **`ext`**: File extensions to exclude
+
+## Example Configuration
+
 ```toml
 root_dir = "."
 
 [os.unix]
 dev = [
-  "python3 main.py", 
-  "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --minify", 
+  "npm run dev",
+  "python3 -m http.server 8080",
+  "npx tailwindcss -i ./src/input.css -o ./dist/output.css --watch"
 ]
-prod = []
-test = []
+
 
 [os.windows]
 dev = [
-  "python main.py", 
-  "npx @tailwindcss\\cli -i .\\src\\input.css -o .\\src\\output.css --minify", 
+  "npm run dev",
+  "python -m http.server 8080",
+  "npx tailwindcss -i .\\src\\input.css -o .\\dist\\output.css --watch"
 ]
-prod = []
-test = []
 
 [exclude]
-dir = [".git", "node_modules", ".mypy_cache", "__pycache__"]
-file = ["README.md"]
-ext = ["toml"]
+dir = [".git", "node_modules", ".mypy_cache", "__pycache__", "dist"]
+file = ["README.md", "LICENSE"]
+ext = ["toml", "log", "tmp"]
 ```
 
-### Installation
-mac os (arm64) and linux (x86_64)
-```bash 
-curl -LsSf https://raw.githubusercontent.com/builtbyjb/tide/main/install.sh | sh
-```
+## Uninstall
 
-windows
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/builtbyjb/tide/main/install.ps1 | iex"
-```
-
-### Uninstall
-mac os and linux
+### macOS & Linux
 ```bash
 rm -rf ~/.local/bin/tide
 ```
 
-windows
+### Windows
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/builtbyjb/tide/main/uninstall.ps1 | iex"
 ```
