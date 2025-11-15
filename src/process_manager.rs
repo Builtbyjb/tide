@@ -94,6 +94,11 @@ impl ProcessManager {
             });
         }
 
+        let status = child.wait().await.expect("Error waiting for process exit signal");
+        if let Some(code) = status.code() {
+            std::process::exit(code);
+        }
+
         Process { child, cmd }
     }
 }
