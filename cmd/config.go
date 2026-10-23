@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/BurntSushi/toml"
 )
@@ -10,12 +11,12 @@ import (
 // Config represents the structure of the tide.toml configuration file.
 type Config struct {
 	RootDir string        `toml:"root_dir"`
-	OS      OSConfig      `toml:"os"`
+	Cmds    OSCommands    `toml:"os"`
 	Exclude ExcludeConfig `toml:"exclude"`
 }
 
-// OSConfig holds platform-specific command maps.
-type OSConfig struct {
+// OSCommands holds platform-specific command maps.
+type OSCommands struct {
 	Unix    map[string][]string `toml:"unix"`
 	Windows map[string][]string `toml:"windows"`
 }
@@ -37,17 +38,15 @@ type ExcludeConfig struct {
 //	    // handle error
 //	}
 func InitConfig(path string) error {
-	// If the file already exists, do nothing.
 	if _, err := os.Stat(path); err == nil {
 		fmt.Println("tide.toml file exists")
 		return nil
 	} else if !os.IsNotExist(err) {
-		// Some other error while trying to stat the file.
 		return fmt.Errorf("checking config file: %w", err)
 	}
 
-	// Default TOML string (human-friendly)
-	defaultToml := `root_dir = "."
+	defaultToml := `
+	root_dir = "."
 
 	[os.unix]
 	dev = []
@@ -73,22 +72,39 @@ func InitConfig(path string) error {
 // LoadConfig reads and parses the tide.toml file at the given path. It returns
 // a Config struct or an error.
 func LoadConfig(path string) (*Config, error) {
-	var cfg Config
+	var config Config
 	if _, err := os.Stat(path); err != nil {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
 	// Ensure non-nil maps to avoid nil map panics downstream
-	if cfg.OS.Unix == nil {
-		cfg.OS.Unix = map[string][]string{}
+	if config.Cmds.Unix == nil {
+		config.Cmds.Unix = map[string][]string{}
 	}
-	if cfg.OS.Windows == nil {
-		cfg.OS.Windows = map[string][]string{}
+	if config.Cmds.Windows == nil {
+		config.Cmds.Windows = map[string][]string{}
 	}
 
-	return &cfg, nil
+	return &config, nil
+}
+
+func ChooseCmds(config *Config, key string) []string {
+	if runtime.GOOS == "windows" {
+		if config.Cmds.Windows != nil {
+			if v, ok := config.Cmds.Windows[key]; ok {
+				return v
+			}
+		}
+	} else {
+		if config.Cmds.Unix != nil {
+			if v, ok := config.Cmds.Unix[key]; ok {
+				return v
+			}
+		}
+	}
+	return nil
 }

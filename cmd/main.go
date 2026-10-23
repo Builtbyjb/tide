@@ -4,179 +4,115 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"runtime"
 	"syscall"
-	"time"
+
+	"github.com/spf13/cobra"
 )
 
-// VERSION for this binary
-const VERSION = "0.1.2"
+const VERSION string = "0.2.0"
 
-func chooseCmds(cfg *Config, key string) []string {
-	if runtime.GOOS == "windows" {
-		if cfg.OS.Windows != nil {
-			if v, ok := cfg.OS.Windows[key]; ok {
-				return v
-			}
-		}
-	} else {
-		if cfg.OS.Unix != nil {
-			if v, ok := cfg.OS.Unix[key]; ok {
-				return v
-			}
-		}
-	}
-	return nil
+var (
+	watch bool
+	split bool
+)
+
+// Represents the application is called without any commands
+var rootCmd = &cobra.Command{
+	Use:   "tide",
+	Short: "An application runner",
+	Long:  "Runs multiple commands in parallel and hot reloads when a file changes",
+	Run: func(cobraCmd *cobra.Command, args []string) {
+		PrintUsage()
+		os.Exit(0)
+	},
 }
 
-func runNonWatch(ctx context.Context, pm *ProcessManager, cmds []string) {
-	// Start commands
-	if err := pm.SpawnCmds(ctx, cmds); err != nil {
-		fmt.Fprintln(os.Stderr, "failed to spawn commands:", err)
-		os.Exit(1)
-	}
-
-	// Wait for any process to exit
-	label, err := pm.WaitAny()
-	// Ensure we attempt to kill all managed processes before exiting
-	_ = pm.KillAll()
-
-	exitCode := 0
-	if err != nil {
-		// Try to determine exit code from exec.ExitError if available
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			// unknown error, use 1
-			exitCode = 1
-		}
-		fmt.Fprintf(os.Stderr, "Command '%s' exited with error: %v (code %d)\n", label, err, exitCode)
-	} else {
-		fmt.Printf("Command '%s' exited successfully\n", label)
-		exitCode = 0
-	}
-	os.Exit(exitCode)
+// Represents when the application is called with the version command
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Prints the current version of the application",
+	Long:  "Prints the current version of the applications",
+	Run: func(cobraCmd *cobra.Command, args []string) {
+		fmt.Printf("tide version: %s\n", VERSION)
+		os.Exit(0)
+	},
 }
 
-func runWatch(ctx context.Context, pm *ProcessManager, cfg *Config, cmds []string) {
-	fmt.Println("Watching...")
-	state := make(map[string]int64)
-
-	// Prime the state with an initial scan (so initial run is considered a change
-	// only if files are discovered)
-	if _, err := Watch(cfg.RootDir, cfg.Exclude.Dir, cfg.Exclude.File, cfg.Exclude.Ext, state); err != nil {
-		fmt.Fprintln(os.Stderr, "watch initial scan error:", err)
-	}
-
-	// Start commands initially
-	if err := pm.SpawnCmds(ctx, cmds); err != nil {
-		fmt.Fprintln(os.Stderr, "failed to spawn commands:", err)
-		// continue: watcher will try to respawn on changes
-	}
-
-	// Goroutine to log when any managed process exits (but we continue watching)
-	go func() {
-		for {
-			label, err := pm.WaitAny()
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					fmt.Fprintf(os.Stderr, "Command '%s' exited with code %d\n", label, exitErr.ExitCode())
-				} else {
-					fmt.Fprintf(os.Stderr, "Command '%s' exited with error: %v\n", label, err)
-				}
-			} else {
-				fmt.Printf("Command '%s' exited successfully\n", label)
-			}
-		}
-	}()
-
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("\nReceived shutdown signal!!! Shutting down gracefully...")
-			_ = pm.KillAll()
-			os.Exit(0)
-		case <-ticker.C:
-			changed, err := Watch(cfg.RootDir, cfg.Exclude.Dir, cfg.Exclude.File, cfg.Exclude.Ext, state)
-			if err != nil {
-				// Log and continue watching
-				fmt.Fprintln(os.Stderr, "watch error:", err)
-				continue
-			}
-			if changed {
-				// restart commands
-				if err := pm.SpawnCmds(ctx, cmds); err != nil {
-					fmt.Fprintln(os.Stderr, "failed to respawn commands:", err)
-				}
-			}
-		}
-	}
+// Represents when the application is called with the help command
+var helpCmd = &cobra.Command{
+	Use:   "help",
+	Short: "Prints the help manual of the application",
+	Long:  "Prints the help manual of the application",
+	Run: func(cobraCmd *cobra.Command, args []string) {
+		PrintUsage()
+		os.Exit(0)
+	},
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		Usage()
-		return
-	}
-
-	switch os.Args[1] {
-	case "init":
+// Represents when the application is called with the init command
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Creates a new tide.toml file",
+	Long:  "Creates a new tide.toml file if one does not exist",
+	Run: func(cobraCmd *cobra.Command, args []string) {
 		if err := InitConfig("tide.toml"); err != nil {
-			fmt.Fprintln(os.Stderr, "Error creating a toml configuration file:", err)
+			fmt.Fprintln(os.Stderr, "Error creating tide.toml file: ", err)
 			os.Exit(1)
 		}
-		return
-	case "--version", "-v":
-		fmt.Printf("tide v%s\n", VERSION)
-		return
-	case "-h", "--help":
-		Usage()
-		return
-	case "run":
-		if len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "run requires a command key (e.g. dev)")
-			os.Exit(1)
-		}
-		key := os.Args[2]
-		watchMode := false
-		if len(os.Args) >= 4 {
-			if os.Args[3] == "--watch" || os.Args[3] == "-w" {
-				watchMode = true
-			}
-		}
+	},
+}
+
+// Represents when the application is called with the run command
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Runs a specified command",
+	Long:  "Runs one of the commands specified in the tide.toml config",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cobraCmd *cobra.Command, args []string) {
 
 		// Load config
-		cfg, err := LoadConfig("tide.toml")
+		config, err := LoadConfig("tide.toml")
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error reading config file:", err)
+			fmt.Fprintln(os.Stderr, "Error reading tide config file: ", err)
 			os.Exit(1)
 		}
 
-		cmds := chooseCmds(cfg, key)
+		cmds := ChooseCmds(config, args[0])
 		if len(cmds) == 0 {
-			fmt.Printf("No command found in the '%s' variable\n", key)
+			fmt.Printf("No command found in the '%s' variable \n", args[0])
 			os.Exit(1)
 		}
 
-		Title(VERSION)
+		PrintTitle(VERSION)
 
-		pm := NewProcessManager()
+		processManager := NewProcessManager()
 
 		// Signal-aware context to control shutdown
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
-		if watchMode {
-			runWatch(ctx, pm, cfg, cmds)
+		if watch {
+			RunWatch(ctx, processManager, config, cmds)
 		} else {
-			runNonWatch(ctx, pm, cmds)
+			RunNonWatch(ctx, processManager, cmds)
 		}
-	default:
-		Usage()
+	},
+}
+
+func init() {
+	// Add run command flags
+	runCmdFlagSet := runCmd.Flags()
+	runCmdFlagSet.BoolVarP(&watch, "watch", "w", false, "tide run [command] --watch")
+	runCmdFlagSet.BoolVarP(&split, "split", "s", false, "tide run [command] --split")
+
+	// Add sub commands
+	rootCmd.AddCommand(runCmd, initCmd, helpCmd, versionCmd)
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to launch application: ", err)
+		os.Exit(1)
 	}
 }

@@ -15,7 +15,7 @@ func colorize(s string, colorCode int, bold bool) string {
 }
 
 // Usage prints a help/usage message to stdout.
-func Usage() {
+func PrintUsage() {
 	header := colorize("Usage:", 36, true) // cyan bold
 	usage := fmt.Sprintf(`
 %s tide [options] [command]
@@ -24,15 +24,17 @@ Options:
     init               Create a tide configuration file
     run [command]      Run commands
         -w, --watch    Watch for changes and re-run commands
-    -h, --help         Display this help message
-    -v, --version      Display the version number
+        -s, --split	   Splits the commands output view, show that they are displayed on seperate panes
+    help               Display this help message
+    version            Display the version number
 `, header)
+
 	fmt.Println(usage)
 }
 
 // Title prints the ASCII art title with the given version string.
 // The styling mirrors the original utilities: a blue bold banner with the version highlighted.
-func Title(version string) {
+func PrintTitle(version string) {
 	blueBold := func(s string) string { return colorize(s, 34, true) }
 	versionStyled := colorize(version, 34, true) // blue bold version
 
@@ -43,7 +45,9 @@ func Title(version string) {
   / /_ / // /_/ //  __/
   \__//_/ \__,_/ \___/  v%s
 
- Press Ctrl + C to exit`, "", versionStyled)
+ Press Ctrl + C to exit
+
+ `, "", versionStyled)
 
 	// Surround the ASCII art with blue bold coloring
 	fmt.Println(blueBold(title))
